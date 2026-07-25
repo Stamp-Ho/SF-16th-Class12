@@ -10,6 +10,7 @@ import {
 	Megaphone,
 	LogOut,
 } from 'lucide-react';
+import ChangePwButton from '@/components/ChangePwButton';
 
 export default async function MainPage() {
 	const supabase = await createClient();
@@ -43,12 +44,12 @@ export default async function MainPage() {
 		<main className="min-h-screen bg-slate-50 p-6 md:p-12">
 			<div className="max-w-5xl mx-auto space-y-8">
 				{/* 상단 헤더 및 프로필 */}
-				<header className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+				<header className="flex justify-between items-center bg-white p-6 pb-5 rounded-2xl shadow-sm border border-slate-100">
 					<div>
 						<h1 className="text-2xl font-bold text-slate-800">
-							SSAFY 504 경매 & 자리 배정
+							[SSAFY 16기] 504호 12반 대시보드
 						</h1>
-						<p className="text-sm text-slate-500 mt-1">
+						<p className="text-sm text-slate-500 mt-2">
 							반갑습니다,{' '}
 							<span className="font-semibold text-slate-800">
 								{profile?.name}
@@ -73,7 +74,7 @@ export default async function MainPage() {
 								관리자 센터
 							</Link>
 						)}
-
+						<ChangePwButton />
 						<form action={logout}>
 							<button
 								type="submit"

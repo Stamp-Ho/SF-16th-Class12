@@ -297,14 +297,14 @@ export default function ClassroomGrid({
 					</div>
 
 					{/* 사용자 이름 표시 영역 */}
-					<div className="my-auto text-center">
+					<div className="my-auto text-center mb-0.5">
 						{isOccupied ? (
-							<p className="font-extrabold text-xl truncate">
+							<p className="font-extrabold text-lg truncate">
 								{personName || '배치 중'}
 							</p>
 						) : (
 							<span
-								className={`text-[10px] font-semibold ${
+								className={`text-sm font-semibold ${
 									isMyGroup ? 'text-white/70' : 'text-slate-400'
 								}`}
 							>
