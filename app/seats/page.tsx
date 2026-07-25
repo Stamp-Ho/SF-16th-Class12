@@ -1,457 +1,361 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useRef, useMemo } from "react";
-import { getSeatRounds, createNewSeatRound } from "./actions";
-import { getRandomDrawHistory } from "../shuffle/actions";
-import ClassroomGrid from "./ClassroomGrid";
-import AdminControlPanel from "./AdminControlPanel";
-import { createClient } from "@/utils/supabase/client";
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { getSeatRounds } from './actions';
+import { getRandomDrawHistory } from '../shuffle/actions';
+import ClassroomGrid from './ClassroomGrid';
+import AdminControlPanel from './AdminControlPanel';
+import { createClient } from '@/utils/supabase/client';
 import {
-  Armchair,
-  PlusCircle,
-  Users,
-  MapPin,
-  Loader2,
-  Coins,
-  CheckCircle2,
-  Clock,
-  ArrowLeft
-} from "lucide-react";
-import Link from "next/link";
+	Armchair,
+	PlusCircle,
+	Users,
+	MapPin,
+	Coins,
+	CheckCircle2,
+	Clock,
+	ArrowLeft,
+} from 'lucide-react';
+import Link from 'next/link';
+import AllocationAddModal from './AllocationAddModal';
 
 export default function SeatAuctionPage() {
-  const supabase = useMemo(() => createClient(), []);
+	const supabase = useMemo(() => createClient(), []);
 
-  const [rounds, setRounds] = useState<any[]>([]);
-  const [selectedRound, setSelectedRound] = useState<any | null>(null);
-  const [groups, setGroups] = useState<any[]>([]); // 💡 생성된 그룹 짝 목록
+	const [rounds, setRounds] = useState<any[]>([]);
+	const [selectedRound, setSelectedRound] = useState<any | null>(null);
+	const [groups, setGroups] = useState<any[]>([]); // 💡 생성된 그룹 짝 목록
 
-  // 모달 상태
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [drawHistory, setDrawHistory] = useState<any[]>([]);
-  const [selectedDrawId, setSelectedDrawId] = useState("");
-  const [roundTitle, setRoundTitle] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
+	// 모달 상태
+	const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // 로그인 사용자 정보
-  const [currentUser, setCurrentUser] = useState({ name: "", isAdmin: false });
-  useEffect(() => {
-    loadData();
-    fetchCurrentUser();
-    // 💡 Supabase Realtime 구독 설정
-    const channel = supabase
-      .channel("realtime-seats")
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "seat_allocations"
-        },
-        (payload) => {
-          const updatedSeat = payload.new;
-          console.log("좌석 업데이트 감지:", updatedSeat);
-          const currentCode = myOccupiedCodeRef.current;
-          const currentGroupId = myGroupIdRef.current;
+	// 로그인 사용자 정보
+	const [currentUser, setCurrentUser] = useState({ name: '', isAdmin: false });
+	useEffect(() => {
+		loadData();
+		fetchCurrentUser();
+		// 💡 Supabase Realtime 구독 설정
+		const channel = supabase
+			.channel('realtime-seats')
+			.on(
+				'postgres_changes',
+				{
+					event: 'UPDATE',
+					schema: 'public',
+					table: 'seat_allocations',
+				},
+				(payload) => {
+					const updatedSeat = payload.new;
+					console.log('좌석 업데이트 감지:', updatedSeat);
+					const currentCode = myOccupiedCodeRef.current;
+					const currentGroupId = myGroupIdRef.current;
 
-          // 내가 선점 중이던 자리를 다른 팀이 뺏어간 경우 알림
-          if (
-            currentCode &&
-            updatedSeat.seat_code === currentCode &&
-            updatedSeat.current_group_id !== currentGroupId &&
-            updatedSeat.current_group_id !== null
-          ) {
-            alert(
-              `⚠️ [경고] ${updatedSeat.seat_code}구역 자리를 다른 팀이 상향 입찰하여 뺏어갔습니다!`
-            );
-          }
+					// 내가 선점 중이던 자리를 다른 팀이 뺏어간 경우 알림
+					if (
+						currentCode &&
+						updatedSeat.seat_code === currentCode &&
+						updatedSeat.current_group_id !== currentGroupId &&
+						updatedSeat.current_group_id !== null
+					) {
+						alert(
+							`⚠️ [경고] ${updatedSeat.seat_code}구역 자리를 다른 팀이 상향 입찰하여 뺏어갔습니다!`,
+						);
+					}
 
-          loadData();
-        }
-      )
-      .subscribe();
+					loadData();
+				},
+			)
+			.subscribe();
 
-    // 컴포넌트 언마운트 시 구독 해제 (메모리 누수 방지)
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-  // 💡 1. 현재 로그인한 유저 프로필 및 Admin 권한 조회
-  async function fetchCurrentUser() {
-    try {
-      const {
-        data: { user }
-      } = await supabase.auth.getUser();
+		// 컴포넌트 언마운트 시 구독 해제 (메모리 누수 방지)
+		return () => {
+			supabase.removeChannel(channel);
+		};
+	}, []);
+	// 💡 1. 현재 로그인한 유저 프로필 및 Admin 권한 조회
+	async function fetchCurrentUser() {
+		try {
+			const {
+				data: { user },
+			} = await supabase.auth.getUser();
 
-      if (!user) return;
+			if (!user) return;
 
-      // profiles 테이블에서 name과 role 조회
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("name, role")
-        .eq("id", user.id)
-        .single();
+			// profiles 테이블에서 name과 role 조회
+			const { data: profile } = await supabase
+				.from('profiles')
+				.select('name, role')
+				.eq('id', user.id)
+				.single();
 
-      if (profile) {
-        setCurrentUser({
-          name: profile.name,
-          isAdmin: profile.role === "admin"
-        });
-      }
-    } catch (err) {
-      console.error("유저 정보 조회 실패:", err);
-    }
-  }
+			if (profile) {
+				setCurrentUser({
+					name: profile.name,
+					isAdmin: profile.role === 'admin',
+				});
+			}
+		} catch (err) {
+			console.error('유저 정보 조회 실패:', err);
+		}
+	}
 
-  async function loadData() {
-    try {
-      const data = await getSeatRounds();
-      setRounds(data);
-      if (data.length > 0) setSelectedRound(data[0]);
-    } catch (err: any) {
-      console.error("데이터 로드 에러:", err);
-    }
-  }
+	async function loadData() {
+		try {
+			const data = await getSeatRounds();
+			setRounds(data);
+			if (data.length > 0) setSelectedRound(data[0]);
+		} catch (err: any) {
+			console.error('데이터 로드 에러:', err);
+		}
+	}
 
-  // 신규 배정 모달 열기
-  const handleOpenCreateModal = async () => {
-    try {
-      const draws = await getRandomDrawHistory();
-      setDrawHistory(draws);
-      setIsModalOpen(true);
-    } catch (err: any) {
-      alert(`추첨 이력 로드 실패: ${err.message}`);
-    }
-  };
+	// 신규 배정 모달 열기
+	const handleOpenCreateModal = () => {
+		setIsModalOpen(true);
+	};
 
-  // 새 배정 생성 Submit
-  const handleCreateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedDrawId || !roundTitle) return;
+	const myOccupiedCodeRef = useRef<string | null>(null);
+	const myGroupIdRef = useRef<string>('');
 
-    setIsCreating(true);
-    try {
-      const nextRoundNum = rounds.length + 1;
-      const result = await createNewSeatRound(
-        nextRoundNum,
-        roundTitle,
-        selectedDrawId
-      );
-      setGroups(result.groups); // 💡 생성된 사람 이름 짝 저장
-      setIsModalOpen(false);
-      setRoundTitle("");
-      setSelectedDrawId("");
-      await loadData();
-    } catch (err: any) {
-      alert(`생성 실패: ${err.message}`);
-    } finally {
-      setIsCreating(false);
-    }
-  };
+	// 1. 현재 회차의 영구 저장된 전체 짝 목록 (initial_groups)
+	const currentGroups = selectedRound?.groups || [];
 
-  const myOccupiedCodeRef = useRef<string | null>(null);
-  const myGroupIdRef = useRef<string>("");
+	// 💡 2. 동명이인이 없으므로 currentGroups에서 내 이름(currentUser.name)이 속한 짝 찾기
+	const myMatchedGroup = currentGroups.find(
+		(g: any) => g.m1 === currentUser.name || g.m2 === currentUser.name,
+	);
 
-  // 1. 현재 회차의 영구 저장된 전체 짝 목록 (initial_groups)
-  const currentGroups = selectedRound?.groups || [];
+	// 내 그룹 ID 및 그룹명 (예: groupId: "GROUP_1", groupName: "정인호, 김철수")
+	const myGroupId = myMatchedGroup?.groupId || '';
+	const myGroupName = myMatchedGroup?.groupName || currentUser.name;
 
-  // 💡 2. 동명이인이 없으므로 currentGroups에서 내 이름(currentUser.name)이 속한 짝 찾기
-  const myMatchedGroup = currentGroups.find(
-    (g: any) => g.m1 === currentUser.name || g.m2 === currentUser.name
-  );
+	// 3. 내가 속한 그룹이 현재 선점하고 있는 구역(A~M) 및 입찰가 정보 검색
+	const myOccupiedSeat = selectedRound?.seats?.find(
+		(s: any) => s.current_group_id === myGroupId && myGroupId !== '',
+	);
+	const myOccupiedCode = myOccupiedSeat?.seat_code || null;
+	const myCurrentBidPrice = myOccupiedSeat?.current_bid_price || 0;
+	useEffect(() => {
+		myOccupiedCodeRef.current = myOccupiedCode;
+		myGroupIdRef.current = myGroupId;
+	}, [myOccupiedCode, myGroupId]);
+	return (
+		<main className="min-h-screen bg-slate-50 p-6 md:p-12">
+			<Link
+				href="/"
+				className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition-colors mb-2 py-2"
+			>
+				<ArrowLeft className="w-4 h-4" /> 메인으로 돌아가기
+			</Link>
+			<div className="max-w-6xl mx-auto space-y-6">
+				{/* 1. 상단 헤더 */}
+				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+					<div>
+						<h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+							<Armchair className="w-7 h-7 text-indigo-600" />
+							자리 배정 경매
+						</h1>
+						<p className="text-xs text-slate-500 mt-1">
+							2주 단위 자리 배정 및 선착순/경매 구역(A~M) 입찰 시스템
+						</p>
+					</div>
 
-  // 내 그룹 ID 및 그룹명 (예: groupId: "GROUP_1", groupName: "정인호, 김철수")
-  const myGroupId = myMatchedGroup?.groupId || "";
-  const myGroupName = myMatchedGroup?.groupName || currentUser.name;
+					{currentUser.isAdmin && (
+						<button
+							onClick={handleOpenCreateModal}
+							className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition-all self-start sm:self-auto"
+						>
+							<PlusCircle className="w-4 h-4" />새 자리 배정 시작
+						</button>
+					)}
+				</div>
 
-  // 3. 내가 속한 그룹이 현재 선점하고 있는 구역(A~M) 및 입찰가 정보 검색
-  const myOccupiedSeat = selectedRound?.seats?.find(
-    (s: any) => s.current_group_id === myGroupId && myGroupId !== ""
-  );
-  const myOccupiedCode = myOccupiedSeat?.seat_code || null;
-  const myCurrentBidPrice = myOccupiedSeat?.current_bid_price || 0;
-  useEffect(() => {
-    myOccupiedCodeRef.current = myOccupiedCode;
-    myGroupIdRef.current = myGroupId;
-  }, [myOccupiedCode, myGroupId]);
-  return (
-    <main className="min-h-screen bg-slate-50 p-6 md:p-12">
-      <Link
-        href="/"
-        className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition-colors mb-2 py-2"
-      >
-        <ArrowLeft className="w-4 h-4" /> 메인으로 돌아가기
-      </Link>
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* 1. 상단 헤더 */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-              <Armchair className="w-7 h-7 text-indigo-600" />
-              자리 배정 경매
-            </h1>
-            <p className="text-xs text-slate-500 mt-1">
-              2주 단위 자리 배정 및 선착순/경매 구역(A~M) 입찰 시스템
-            </p>
-          </div>
+				{/* 2. 회차 선택 탭 */}
+				<div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-200">
+					{rounds.map((r) => (
+						<button
+							key={r.roundNumber}
+							onClick={() => setSelectedRound(r)}
+							className={`px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
+								selectedRound?.roundNumber === r.roundNumber
+									? 'bg-slate-900 text-white shadow-sm'
+									: 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+							}`}
+						>
+							{r.title} ({r.isClosed ? '마감됨' : '진행중'})
+						</button>
+					))}
+				</div>
 
-          {currentUser.isAdmin && (
-            <button
-              onClick={handleOpenCreateModal}
-              className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition-all self-start sm:self-auto"
-            >
-              <PlusCircle className="w-4 h-4" />새 자리 배정 시작
-            </button>
-          )}
-        </div>
+				{/* 3. 내 그룹 및 선점 위치 요약 카드 */}
+				{selectedRound && (
+					<section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+						{/* 내 소속 짝 카드 */}
+						<div className="bg-gradient-to-br from-indigo-500 to-indigo-600 text-white p-5 rounded-2xl shadow-md flex items-center justify-between">
+							<div className="space-y-1">
+								<span className="text-[10px] font-bold bg-white/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+									MY PAIR
+								</span>
+								<h3 className="text-xl font-black">{myGroupName}</h3>
+								<p className="text-indigo-100 text-xs">
+									본인:{' '}
+									<span className="font-bold underline">
+										{currentUser.name}
+									</span>
+								</p>
+							</div>
+							<div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center">
+								<Users className="w-6 h-6 text-indigo-100" />
+							</div>
+						</div>
 
-        {/* 2. 회차 선택 탭 */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-200">
-          {rounds.map((r) => (
-            <button
-              key={r.roundNumber}
-              onClick={() => setSelectedRound(r)}
-              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
-                selectedRound?.roundNumber === r.roundNumber
-                  ? "bg-slate-900 text-white shadow-sm"
-                  : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
-              }`}
-            >
-              {r.title} ({r.isClosed ? "마감됨" : "진행중"})
-            </button>
-          ))}
-        </div>
+						{/* 현재 선점 위치 카드 */}
+						<div
+							className={`p-5 rounded-2xl shadow-md flex items-center justify-between border ${
+								myOccupiedCode
+									? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white border-amber-400'
+									: 'bg-white text-slate-800 border-slate-200'
+							}`}
+						>
+							<div className="space-y-1">
+								<span
+									className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+										myOccupiedCode
+											? 'bg-white/20 text-white'
+											: 'bg-slate-100 text-slate-500'
+									}`}
+								>
+									CURRENT SEAT
+								</span>
+								<h3 className="text-xl font-black flex items-center gap-2">
+									{myOccupiedCode ? (
+										<>
+											<span>{myOccupiedCode} 구역 선점 중</span>
+											<span className="text-xs font-normal bg-black/20 px-2 py-0.5 rounded-lg flex items-center gap-1">
+												<Coins className="w-3 h-3 text-amber-200" />
+												{myCurrentBidPrice.toLocaleString()}원
+											</span>
+										</>
+									) : (
+										<span className="text-slate-400">
+											선점한 자리가 없습니다
+										</span>
+									)}
+								</h3>
+								<p
+									className={`text-xs ${
+										myOccupiedCode ? 'text-amber-100' : 'text-slate-400'
+									}`}
+								>
+									{myCurrentBidPrice > 0
+										? '상향 입찰 당하기 전까지는 다른 구역 입찰이 불가합니다.'
+										: myOccupiedCode
+											? '빈 자리 클릭시 0원으로 자유 이동 가능합니다.'
+											: '빈 자리를 눌러 0원으로 빠르게 선점하세요!'}
+								</p>
+							</div>
+							<div
+								className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+									myOccupiedCode ? 'bg-white/10' : 'bg-slate-100 text-slate-400'
+								}`}
+							>
+								<MapPin className="w-6 h-6" />
+							</div>
+						</div>
+					</section>
+				)}
 
-        {/* 3. 내 그룹 및 선점 위치 요약 카드 */}
-        {selectedRound && (
-          <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* 내 소속 짝 카드 */}
-            <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 text-white p-5 rounded-2xl shadow-md flex items-center justify-between">
-              <div className="space-y-1">
-                <span className="text-[10px] font-bold bg-white/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                  MY PAIR
-                </span>
-                <h3 className="text-xl font-black">{myGroupName}</h3>
-                <p className="text-indigo-100 text-xs">
-                  본인:{" "}
-                  <span className="font-bold underline">
-                    {currentUser.name}
-                  </span>
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center">
-                <Users className="w-6 h-6 text-indigo-100" />
-              </div>
-            </div>
+				{/* 4. 어드민 제어 패널 */}
+				{currentUser.isAdmin && selectedRound && (
+					<AdminControlPanel
+						roundNumber={selectedRound.roundNumber}
+						isClosed={selectedRound.isClosed}
+						allGroups={groups}
+					/>
+				)}
 
-            {/* 현재 선점 위치 카드 */}
-            <div
-              className={`p-5 rounded-2xl shadow-md flex items-center justify-between border ${
-                myOccupiedCode
-                  ? "bg-gradient-to-br from-amber-500 to-orange-600 text-white border-amber-400"
-                  : "bg-white text-slate-800 border-slate-200"
-              }`}
-            >
-              <div className="space-y-1">
-                <span
-                  className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
-                    myOccupiedCode
-                      ? "bg-white/20 text-white"
-                      : "bg-slate-100 text-slate-500"
-                  }`}
-                >
-                  CURRENT SEAT
-                </span>
-                <h3 className="text-xl font-black flex items-center gap-2">
-                  {myOccupiedCode ? (
-                    <>
-                      <span>{myOccupiedCode} 구역 선점 중</span>
-                      <span className="text-xs font-normal bg-black/20 px-2 py-0.5 rounded-lg flex items-center gap-1">
-                        <Coins className="w-3 h-3 text-amber-200" />
-                        {myCurrentBidPrice.toLocaleString()}원
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-slate-400">
-                      선점한 자리가 없습니다
-                    </span>
-                  )}
-                </h3>
-                <p
-                  className={`text-xs ${
-                    myOccupiedCode ? "text-amber-100" : "text-slate-400"
-                  }`}
-                >
-                  {myCurrentBidPrice > 0
-                    ? "상향 입찰 당하기 전까지는 다른 구역 입찰이 불가합니다."
-                    : myOccupiedCode
-                      ? "빈 자리 클릭시 0원으로 자유 이동 가능합니다."
-                      : "빈 자리를 눌러 0원으로 빠르게 선점하세요!"}
-                </p>
-              </div>
-              <div
-                className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
-                  myOccupiedCode ? "bg-white/10" : "bg-slate-100 text-slate-400"
-                }`}
-              >
-                <MapPin className="w-6 h-6" />
-              </div>
-            </div>
-          </section>
-        )}
+				{/* 💡 5. [메인 2열 레이아웃] 좌측: 배치도 / 우측: 전체 그룹 현황 */}
+				{selectedRound ? (
+					<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+						{/* 좌측 (2열 차지): 배치도 */}
+						<div className="lg:col-span-2">
+							<ClassroomGrid
+								roundNumber={selectedRound.roundNumber}
+								seatList={selectedRound.seats}
+								myGroupId={myGroupId}
+								myGroupName={myGroupName}
+								currentUserName={currentUser.name}
+								isAdmin={currentUser.isAdmin}
+							/>
+						</div>
 
-        {/* 4. 어드민 제어 패널 */}
-        {currentUser.isAdmin && selectedRound && (
-          <AdminControlPanel
-            roundNumber={selectedRound.roundNumber}
-            isClosed={selectedRound.isClosed}
-            allGroups={groups}
-          />
-        )}
+						{/* 💡 우측 (1열 차지): 전체 2인 짝 그룹 현황 리스트 */}
+						<div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+							<div className="flex items-center justify-between border-b border-slate-100 pb-3">
+								<h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+									<Users className="w-4 h-4 text-indigo-600" />
+									전체 매핑 짝 목록 ({groups.length > 0 ? groups.length : 13}개
+									짝)
+								</h3>
+							</div>
 
-        {/* 💡 5. [메인 2열 레이아웃] 좌측: 배치도 / 우측: 전체 그룹 현황 */}
-        {selectedRound ? (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-            {/* 좌측 (2열 차지): 배치도 */}
-            <div className="lg:col-span-2">
-              <ClassroomGrid
-                roundNumber={selectedRound.roundNumber}
-                seatList={selectedRound.seats}
-                myGroupId={myGroupId}
-                myGroupName={myGroupName}
-                currentUserName={currentUser.name}
-                isAdmin={currentUser.isAdmin}
-              />
-            </div>
+							<div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+								{currentGroups.map((g: any, idx: number) => {
+									const occupiedSeat = selectedRound.seats.find(
+										(s: any) => s.current_group_id === g.groupId,
+									);
 
-            {/* 💡 우측 (1열 차지): 전체 2인 짝 그룹 현황 리스트 */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                  <Users className="w-4 h-4 text-indigo-600" />
-                  전체 매핑 짝 목록 ({groups.length > 0 ? groups.length : 13}개
-                  짝)
-                </h3>
-              </div>
+									return (
+										<div
+											key={g.groupId || idx}
+											className={`p-3 rounded-2xl border text-xs flex items-center justify-between transition-all ${
+												occupiedSeat
+													? 'bg-slate-50 border-slate-200'
+													: 'bg-amber-50/50 border-amber-200/60'
+											}`}
+										>
+											<div>
+												<p className="font-bold text-slate-800">
+													{g.groupName || `${g.m1}, ${g.m2}`}
+												</p>
+												<p className="text-[10px] text-slate-400 mt-0.5">
+													{g.m1} • {g.m2}
+												</p>
+											</div>
 
-              <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
-                {currentGroups.map((g: any, idx: number) => {
-                  const occupiedSeat = selectedRound.seats.find(
-                    (s: any) => s.current_group_id === g.groupId
-                  );
+											{occupiedSeat ? (
+												<span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 px-2 py-1 rounded-lg font-extrabold text-[11px]">
+													<CheckCircle2 className="w-3 h-3" />
+													{occupiedSeat.seat_code} 구역
+												</span>
+											) : (
+												<span className="inline-flex items-center gap-1 bg-rose-100 text-rose-700 px-2 py-1 rounded-lg font-bold text-[10px]">
+													<Clock className="w-3 h-3" /> 미배정
+												</span>
+											)}
+										</div>
+									);
+								})}
+							</div>
+						</div>
+					</div>
+				) : (
+					<div className="bg-white p-12 rounded-3xl text-center text-slate-400 text-xs border border-dashed border-slate-200">
+						진행 중인 자리 배정이 없습니다. [새 자리 배정 시작] 버튼을
+						눌러주세요.
+					</div>
+				)}
 
-                  return (
-                    <div
-                      key={g.groupId || idx}
-                      className={`p-3 rounded-2xl border text-xs flex items-center justify-between transition-all ${
-                        occupiedSeat
-                          ? "bg-slate-50 border-slate-200"
-                          : "bg-amber-50/50 border-amber-200/60"
-                      }`}
-                    >
-                      <div>
-                        <p className="font-bold text-slate-800">
-                          {g.groupName || `${g.m1}, ${g.m2}`}
-                        </p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">
-                          {g.m1} • {g.m2}
-                        </p>
-                      </div>
-
-                      {occupiedSeat ? (
-                        <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 px-2 py-1 rounded-lg font-extrabold text-[11px]">
-                          <CheckCircle2 className="w-3 h-3" />
-                          {occupiedSeat.seat_code} 구역
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 bg-rose-100 text-rose-700 px-2 py-1 rounded-lg font-bold text-[10px]">
-                          <Clock className="w-3 h-3" /> 미배정
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-white p-12 rounded-3xl text-center text-slate-400 text-xs border border-dashed border-slate-200">
-            진행 중인 자리 배정이 없습니다. [새 자리 배정 시작] 버튼을
-            눌러주세요.
-          </div>
-        )}
-
-        {/* 신규 자리 배정 생성 모달 */}
-        {isModalOpen && (
-          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-md rounded-2xl p-6 space-y-4 shadow-2xl">
-              <h3 className="text-lg font-bold text-slate-800">
-                새 자리 배정 시작
-              </h3>
-
-              <form onSubmit={handleCreateSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    회차 제목 (예: 8월 1~2주차 자리 배정)
-                  </label>
-                  <input
-                    type="text"
-                    value={roundTitle}
-                    onChange={(e) => setRoundTitle(e.target.value)}
-                    placeholder="2주 단위 회차 제목 입력"
-                    className="w-full text-xs p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    기반이 될 순서 추첨 결과 선택
-                  </label>
-                  <select
-                    value={selectedDrawId}
-                    onChange={(e) => setSelectedDrawId(e.target.value)}
-                    className="w-full text-xs p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-                    required
-                  >
-                    <option value="">추첨 결과를 선택하세요</option>
-                    {drawHistory.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.title} ({new Date(d.created_at).toLocaleDateString()}
-                        )
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    * 선택한 추첨 순서대로 1,2번, 3,4번이 자동으로 2인 짝으로
-                    매핑됩니다.
-                  </p>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 rounded-xl"
-                  >
-                    취소
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isCreating}
-                    className="px-4 py-2 text-xs font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 flex items-center gap-1"
-                  >
-                    {isCreating && (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    )}
-                    생성 시작
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-      </div>
-    </main>
-  );
+				{/* 신규 자리 배정 생성 모달 */}
+				{isModalOpen && (
+					<AllocationAddModal
+						onClose={() => setIsModalOpen(false)}
+						rounds={rounds}
+						setGroups={setGroups}
+						loadData={loadData}
+					/>
+				)}
+			</div>
+		</main>
+	);
 }
