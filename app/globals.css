@@ -1,26 +1,59 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+	--background: #ffffff;
+	--foreground: #171717;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--font-sans: var(--font-geist-sans);
+	--font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+	:root {
+		--background: #0a0a0a;
+		--foreground: #ededed;
+	}
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+	background: var(--background);
+	color: var(--foreground);
+	font-family: Arial, Helvetica, sans-serif;
+}
+/* ==========================================================================
+   글로벌 커스텀 스크롤바 스타일 (Webkit & Firefox)
+   ========================================================================== */
+
+/* 1. Chrome, Safari, Edge, Opera 지원 */
+::-webkit-scrollbar {
+	width: 6px; /* 세로 스크롤바 두께 */
+	height: 6px; /* 가로 스크롤바 두께 */
+}
+
+/* 스크롤바 트랙 (배경) */
+::-webkit-scrollbar-track {
+	background: transparent; /* 평소에는 배경 투명 */
+	border-radius: 9999px;
+}
+
+/* 스크롤바 썸 (움직이는 바) */
+::-webkit-scrollbar-thumb {
+	background-color: #cbd5e1; /* slate-300 (기본 색상) */
+	border-radius: 9999px;
+	transition: background-color 0.2s ease-in-out;
+}
+
+/* 스크롤바 마우스 호버 시 */
+::-webkit-scrollbar-thumb:hover {
+	background-color: #94a3b8; /* slate-400 (호버 시 진하게) */
+}
+
+/* 2. Firefox 지원 */
+* {
+	scrollbar-width: thin; /* 얇은 스크롤바 */
+	scrollbar-color: #cbd5e1 transparent; /* thumb 색상, track 색상 */
 }

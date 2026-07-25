@@ -90,7 +90,7 @@ export default async function MainPage() {
 				<section className="grid grid-cols-1 md:grid-cols-2 gap-4">
 					<Link
 						href="/seats"
-						className="group bg-gradient-to-br from-indigo-500 to-indigo-600 text-white p-6 rounded-2xl shadow-md hover:shadow-lg transition-all"
+						className="group bg-linear-to-br from-indigo-500 to-indigo-600 text-white p-6 rounded-2xl shadow-md hover:shadow-lg transition-all"
 					>
 						<div className="flex justify-between items-start">
 							<div>
@@ -108,7 +108,7 @@ export default async function MainPage() {
 
 					<Link
 						href="/shuffle"
-						className="group bg-gradient-to-br from-emerald-500 to-teal-600 text-white p-6 rounded-2xl shadow-md hover:shadow-lg transition-all"
+						className="group bg-linear-to-br from-emerald-500 to-teal-600 text-white p-6 rounded-2xl shadow-md hover:shadow-lg transition-all"
 					>
 						<div className="flex justify-between items-start">
 							<div>
