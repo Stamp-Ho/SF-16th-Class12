@@ -337,7 +337,7 @@ export default function ClassroomGrid({
 							.replace(
 								'ring-3',
 								'ring-2',
-							)} ${tile.num % 6 === 4 ? '-left-10.5 px-2.5' : '-left-5.5 '}`}
+							)} ${tile.num % 6 === 4 ? '-left-10.5 px-2.5' : 'left-[-20.75px] '}`}
 						title="좌/우 자리 교환"
 					>
 						<ArrowLeftRight className="w-3 h-3" />
