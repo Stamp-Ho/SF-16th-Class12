@@ -124,77 +124,39 @@ export async function placeOrMoveSeatBid(
 	myGroupId: string,
 	myGroupName: string,
 ) {
-	const supabase = await createClient();
+	try {
+		const supabase = await createClient();
 
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
-	if (!user) throw new Error('로그인이 필요합니다.');
+		const {
+			data: { user },
+		} = await supabase.auth.getUser();
 
-	const { data: seats, error: fetchError } = await supabase
-		.from('seat_allocations')
-		.select('*')
-		.eq('round_number', roundNumber);
-
-	if (fetchError || !seats) throw new Error('좌석 정보를 불러올 수 없습니다.');
-
-	const targetSeat = seats.find((s) => s.seat_code === targetSeatCode);
-	if (!targetSeat) throw new Error('대상 구역을 찾을 수 없습니다.');
-	if (targetSeat.is_closed) throw new Error('마감된 경매 구역입니다.');
-
-	const currentMySeat = seats.find((s) => s.current_group_id === myGroupId);
-
-	if (currentMySeat?.seat_code === targetSeatCode) {
-		return { success: true, message: '이미 선점하고 있는 구역입니다.' };
-	}
-
-	// 다른 자리로 이동하려는 경우
-	if (currentMySeat) {
-		if (currentMySeat.current_bid_price === 0) {
-			// 기존 선점 구역 초기화 (반납)
-			await supabase
-				.from('seat_allocations')
-				.update({
-					current_group_id: null,
-					current_group_name: null,
-					member_left: null,
-					member_right: null,
-					current_bidder_id: null,
-					current_bid_price: 0,
-				})
-				.eq('id', currentMySeat.id);
-		} else {
-			throw new Error(
-				'현재 선점 중인 자리를 낙찰받을 예정입니다.\n다른 구역에 입찰할 수 없습니다.',
-			);
+		if (!user) {
+			return { success: false, error: '로그인이 필요합니다.' };
 		}
+
+		// RPC 함수 호출
+		const { data, error } = await supabase.rpc('place_or_move_seat_bid', {
+			p_round_number: roundNumber,
+			p_target_seat_code: targetSeatCode,
+			p_my_group_id: myGroupId,
+			p_my_group_name: myGroupName,
+			p_user_id: user.id,
+		});
+
+		if (error) {
+			return { success: false, error: 'Database RPC 오류: ' + error.message };
+		}
+
+		// PostgreSQL 함수에서 전달한 JSON 결과 리턴 ({ success, error, message })
+		if (data?.success) {
+			revalidatePath('/seats');
+		}
+
+		return data;
+	} catch (err: any) {
+		return { success: false, error: '요청을 처리하는 중 오류가 발생했습니다.' };
 	}
-
-	const nextPrice =
-		targetSeat.current_bid_price === 0 && !targetSeat.current_group_id
-			? 0
-			: targetSeat.current_bid_price + 500;
-
-	// 이름 추출
-	const names = myGroupName.split(',').map((n) => n.trim());
-
-	const { error: updateError } = await supabase
-		.from('seat_allocations')
-		.update({
-			current_group_id: myGroupId,
-			current_group_name: myGroupName,
-			member_left: names[0] || null,
-			member_right: names[1] || null,
-			current_bidder_id: user.id,
-			current_bid_price: nextPrice,
-			updated_at: new Date().toISOString(),
-		})
-		.eq('id', targetSeat.id);
-
-	if (updateError) throw new Error(updateError.message);
-
-	revalidatePath('/seats');
-	return { success: true };
 }
 
 // ==========================================

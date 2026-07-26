@@ -107,10 +107,20 @@ export default function ClassroomGrid({
 
 	// 클릭 입찰 함수
 	const handleSeatClick = async (code: string) => {
-		try {
-			await placeOrMoveSeatBid(roundNumber, code, myGroupId, myGroupName);
-		} catch (err: any) {
-			alert(err.message);
+		const res = await placeOrMoveSeatBid(
+			roundNumber,
+			code,
+			myGroupId,
+			myGroupName,
+		);
+
+		if (!res.success) {
+			alert(res.error);
+			return;
+		}
+
+		if (res.message) {
+			alert(res.message);
 		}
 	};
 
