@@ -101,7 +101,11 @@ export default function SeatAuctionPage() {
 		try {
 			const data = await getSeatRounds();
 			setRounds(data);
-			if (!selectedRound && data.length > 0) {
+			if (
+				data.filter((r) => r.roundNumber === selectedRound?.roundNumber)
+					.length === 0 ||
+				(!selectedRound && data.length > 0)
+			) {
 				setSelectedRound((prevSelected: any) => {
 					// 1. 이미 선택된 회차가 있다면, DB에서 새로 받아온 data 중 같은 회차(roundNumber)를 찾아 최신 상태로 업데이트
 					if (prevSelected) {
@@ -204,7 +208,7 @@ export default function SeatAuctionPage() {
 					<AdminControlPanel
 						roundNumber={selectedRound.roundNumber}
 						isClosed={selectedRound.isClosed}
-						allGroups={groups}
+						loadData={loadData}
 					/>
 				)}
 
@@ -220,6 +224,7 @@ export default function SeatAuctionPage() {
 								myGroupName={myGroupName}
 								currentUserName={currentUser.name}
 								isAdmin={currentUser.isAdmin}
+								loadData={loadData}
 							/>
 						</div>
 

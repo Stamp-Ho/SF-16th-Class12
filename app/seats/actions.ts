@@ -283,3 +283,46 @@ export async function assignUnallocatedGroupsRandomly(roundNumber: number) {
 	revalidatePath('/seats');
 	return { success: true };
 }
+
+// ==========================================
+// 7. Admin 전용: 특정 회차의 모든 좌석 데이터 삭제
+// ==========================================
+export async function deleteSeatRound(roundNumber: number) {
+	const supabase = await createClient();
+	const { error } = await supabase
+		.from('seat_allocations')
+		.delete()
+		.eq('round_number', roundNumber);
+
+	if (error) {
+		throw new Error(`자리 배정 회차 삭제 실패: ${error.message}`);
+	}
+
+	revalidatePath('/seats');
+	return { success: true };
+}
+// ==========================================
+// 8. Admin 전용: 특정 좌석 데이터 삭제 (좌석 코드, 라운드 기준)
+// ==========================================
+export async function deleteSeatInfo(seatId: string, roundNumber: number) {
+	const supabase = await createClient();
+	const { error } = await supabase
+		.from('seat_allocations')
+		.update({
+			current_group_id: null,
+			current_group_name: null,
+			member_left: null,
+			member_right: null,
+			current_bid_price: 0,
+			is_closed: false,
+		})
+		.eq('id', seatId)
+		.eq('round_number', roundNumber);
+
+	if (error) {
+		throw new Error(`좌석 삭제 실패: ${error.message}`);
+	}
+
+	revalidatePath('/seats');
+	return { success: true };
+}

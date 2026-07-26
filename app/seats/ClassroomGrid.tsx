@@ -1,8 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { placeOrMoveSeatBid, swapSeatPositions } from './actions';
-import { ArrowLeftRight, Sparkles, Star } from 'lucide-react';
+import { useState, useTransition } from 'react';
+import {
+	deleteSeatInfo,
+	placeOrMoveSeatBid,
+	swapSeatPositions,
+} from './actions';
+import { ArrowLeftRight, Sparkles, Star, Trash } from 'lucide-react';
 
 interface SeatData {
 	id: string;
@@ -91,6 +95,7 @@ export default function ClassroomGrid({
 	myGroupName,
 	currentUserName,
 	isAdmin,
+	loadData,
 }: {
 	roundNumber: number;
 	seatList: SeatData[];
@@ -98,7 +103,9 @@ export default function ClassroomGrid({
 	myGroupName: string;
 	currentUserName: string;
 	isAdmin: boolean;
+	loadData: () => void;
 }) {
+	const [isPending, startTransition] = useTransition();
 	// 💡 드래그 중인 타일의 시각적 피드백 상태 (드롭 호버 중인 구역 코드)
 	const [dragOverCode, setDragOverCode] = useState<string | null>(null);
 
@@ -116,12 +123,14 @@ export default function ClassroomGrid({
 
 		if (!res.success) {
 			alert(res.error);
+			loadData();
 			return;
 		}
 
 		if (res.message) {
 			alert(res.message);
 		}
+		// 배치 후 데이터 새로고침
 	};
 
 	// 💡 드래그 앤 드롭 전용 입찰/배정 처리 함수
@@ -271,7 +280,7 @@ export default function ClassroomGrid({
 		return (
 			<div key={tile.num} className={`relative`}>
 				<div
-					onClick={() => handleSeatClick(tile.code)}
+					onClick={() => !isPending && handleSeatClick(tile.code)}
 					// 💡 Drag & Drop Event Listeners 추가
 					onDragOver={(e) => handleDragOver(e, tile.code)}
 					onDragLeave={(e) => handleDragLeave(e, tile.code)}
@@ -337,6 +346,7 @@ export default function ClassroomGrid({
 				{canSwap && seatInfo && !isLeft && (
 					<button
 						onMouseEnter={(e) => e.stopPropagation()}
+						disabled={isPending}
 						onClick={(e) => {
 							e.preventDefault();
 							handleSwapClick(e, seatInfo.id);
@@ -351,6 +361,34 @@ export default function ClassroomGrid({
 						title="좌/우 자리 교환"
 					>
 						<ArrowLeftRight className="w-3 h-3" />
+					</button>
+				)}
+				{isAdmin && seatInfo && !isLeft && (
+					<button
+						onMouseEnter={(e) => e.stopPropagation()}
+						disabled={isPending}
+						onClick={(e) => {
+							e.preventDefault();
+							if (confirm('정말로 이 좌석 정보를 삭제하시겠습니까?')) {
+								startTransition(async () => {
+									try {
+										await deleteSeatInfo(seatInfo.id, roundNumber);
+									} catch (err: any) {
+										alert(`삭제 에러: ${err.message}`);
+									}
+								});
+							}
+						}}
+						className={`absolute top-14.5 p-1 rounded-full border-2 transition-colors cursor-pointer ${colorClass
+							.replace('bg-', 'bg-white ')
+							.replace('text-', 'text-slate-900 ')
+							.replace(
+								'ring-3',
+								'ring-2',
+							)} ${tile.num % 6 === 4 ? '-left-9' : '-left-4 '}`}
+						title="좌석 삭제"
+					>
+						<Trash className="w-3 h-3" />
 					</button>
 				)}
 			</div>
