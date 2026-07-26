@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react';
 import { createNewSeatRound } from './actions';
-import { Loader2, ChevronLeft, ChevronRight, Hash } from 'lucide-react';
+import { createClient } from '@/utils/supabase/client';
+import {
+	Loader2,
+	ChevronLeft,
+	ChevronRight,
+	Hash,
+	RotateCcw,
+	Edit3,
+	Trash2,
+	GripVertical,
+} from 'lucide-react';
 import { LayoutGroup, motion } from 'framer-motion';
 
 interface AllocationAddModalProps {
@@ -39,15 +49,13 @@ const firstOrder = [
 	'장지현',
 ];
 
-/**
- * 링 경로 인덱스 빌드: 0번 고정, 나머지는 지정 궤도 순서
- */
 const ringOrder = [
 	0, 2, 4, 1, 6, 3, 8, 5, 10, 7, 12, 9, 14, 11, 16, 13, 18, 15, 20, 17, 22, 19,
 	24, 21, 25, 23,
 ];
+
 function rotateOrder(baseList: string[], rotateTimes: number = 1): string[] {
-	if (rotateTimes == 0) return baseList;
+	if (rotateTimes === 0) return baseList;
 	const n = baseList.length;
 	const result: string[] = [];
 
@@ -57,39 +65,17 @@ function rotateOrder(baseList: string[], rotateTimes: number = 1): string[] {
 	return rotateTimes > 0 ? rotateOrder(result, rotateTimes - 1) : result;
 }
 
-/**
- * 링 회전 후 짝 생성
- */
 function generateCustomShiftPairs(baseList: string[], roundIndex: number) {
 	const fullList = rotateOrder(baseList, roundIndex);
 	const pairs: [string, string][] = [];
 
 	for (let i = 0; i < fullList.length; i += 2) {
-		pairs.push([fullList[i], fullList[i + 1]]);
+		pairs.push([fullList[i] || '빈자리', fullList[i + 1] || '빈자리']);
 	}
 
 	return pairs;
 }
 
-/**
- * 💡 이름 셀 컴포넌트: layoutId와 layout 속성을 통해 위치 변경 시 이동 애니메이션 연출
- */
-function NameCard({ name }: { name: string }) {
-	return (
-		<motion.div
-			layout
-			layoutId={`person-${name}`}
-			transition={{
-				type: 'spring',
-				stiffness: 350,
-				damping: 28,
-			}}
-			className="w-full text-center font-bold text-slate-800 bg-white border border-slate-200/90 rounded-lg py-1.5 shadow-sm hover:border-indigo-400 transition-colors"
-		>
-			{name}
-		</motion.div>
-	);
-}
 const dateList = [
 	'07.20 ~ 07.31',
 	'08.03 ~ 08.14',
@@ -113,20 +99,152 @@ export default function AllocationAddModal({
 }: AllocationAddModalProps) {
 	const initialNextRound = rounds.length + 1;
 	const [targetRound, setTargetRound] = useState<number>(initialNextRound);
-
 	const [roundTitle, setRoundTitle] = useState(
-		`${targetRound}회차 (${dateList[targetRound - 1]})`,
+		`${targetRound}회차 (${dateList[targetRound - 1] || '2주 배정'})`,
 	);
 	const [isCreating, setIsCreating] = useState(false);
+	const [isLoadingLast, setIsLoadingLast] = useState(false);
 
-	// 현재 선택된 회차 기준 짝 계산
-	const previewPairs = generateCustomShiftPairs(firstOrder, targetRound - 1);
+	// 💡 1차원 배정 배열 관리 (커스텀 드래그/삭제용)
+	const [flatMembers, setFlatMembers] = useState<
+		{ name: string; status: boolean }[]
+	>(() =>
+		generateCustomShiftPairs(firstOrder, initialNextRound - 1)
+			.flat()
+			.map((name) => ({ name, status: true })),
+	);
 
+	// 💡 커스텀 편집 모드 토글
+	const [isCustomMode, setIsCustomMode] = useState(false);
+	// 드래그 중인 인덱스
+	const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+	// 회차 변경시 자동 링 회전 목록 업데이트 (커스텀 모드가 아닐 때만)
 	const handleRoundChange = (newRound: number) => {
-		if (newRound < 1) return;
+		// 커스텀 모드일 때의 회차 제한 규칙
+		if (isCustomMode) {
+			// 1. 이전 회차로는 이동 불가
+			if (newRound < targetRound) {
+				alert('커스텀 편집 모드에서는 이전 회차로 이동할 수 없습니다.');
+				return;
+			}
+			// 2. 다음 회차는 최대 1회(initialNextRound + 1)까지만 허용
+			if (newRound > initialNextRound + 1) {
+				alert('커스텀 편집 모드에서는 다음 회차로 1회만 이동 가능합니다.');
+				return;
+			}
+		} else {
+			if (newRound < 1) return;
+		}
+
 		setTargetRound(newRound);
-		setRoundTitle(`${newRound}회차 (${dateList[newRound - 1]})`);
+		setRoundTitle(`${newRound}회차 (${dateList[newRound - 1] || '2주 배정'})`);
+
+		// 커스텀 모드가 아닐 때만 자동 링 계산 반영
+		if (!isCustomMode) {
+			const newPairs = generateCustomShiftPairs(firstOrder, newRound - 1);
+			setFlatMembers(newPairs.flat().map((name) => ({ name, status: true })));
+		} else {
+			const newPairs = generateCustomShiftPairs(
+				currentPairs.flat().map(({ name }) => name),
+				1,
+			);
+			setFlatMembers(
+				newPairs.flat().map((name) => ({
+					name,
+					status: flatMembers.find((m) => m.name === name)?.status ?? true,
+				})),
+			);
+		}
 	};
+
+	// 💡 1. DB에서 가장 높은 회차 데이터 불러오기
+	const handleLoadLastRoundFromDB = async () => {
+		setIsLoadingLast(true);
+		try {
+			const supabase = createClient();
+			// seat_allocations 테이블에서 가장 최신/높은 round_number 구하기
+			const { data, error } = await supabase
+				.from('seat_allocations')
+				.select('round_number, current_group_id, initial_groups')
+				.order('round_number', { ascending: false })
+				.limit(30);
+
+			if (error) throw error;
+
+			if (!data || data.length === 0) {
+				alert('저장된 지난 회차 배정 데이터가 없습니다.');
+				return;
+			}
+
+			const latestRoundNum = data[0].round_number;
+			const latestRoundSeats = data[0].initial_groups.reduce(
+				(acc: string[], group: { m1?: string; m2?: string }) => {
+					if (group.m1) acc.push(group.m1);
+					if (group.m2) acc.push(group.m2);
+					return acc;
+				},
+				[] as string[],
+			);
+
+			if (latestRoundSeats.length > 0) {
+				setFlatMembers(
+					latestRoundSeats.map((name: string) => ({ name, status: true })),
+				);
+				setIsCustomMode(true); // 불러온 후 커스텀 모드로 전환
+				alert(`최신(${latestRoundNum}회차) 데이터를 성공적으로 불러왔습니다!`);
+			}
+		} catch (err: any) {
+			alert(`불러오기 실패: ${err.message}`);
+		} finally {
+			setIsLoadingLast(false);
+		}
+	};
+
+	// 💡 2. 삭제 처리 (빈자리로 변경)
+	const handleRemoveMember = (indexToRemove: number) => {
+		setFlatMembers((prev) =>
+			prev.map((m, idx) =>
+				idx === indexToRemove ? { name: m.name, status: false } : m,
+			),
+		);
+	};
+
+	// 💡 3. 드래그 앤 드롭 순서 변경
+	const handleDragStart = (e: React.DragEvent, index: number) => {
+		setDraggedIndex(index);
+		e.dataTransfer.effectAllowed = 'move';
+	};
+
+	const handleDragOver = (e: React.DragEvent) => {
+		e.preventDefault();
+	};
+
+	const handleDrop = (targetIndex: number) => {
+		if (draggedIndex === null || draggedIndex === targetIndex) return;
+
+		const updated = [...flatMembers];
+
+		// 두 위치의 원소를 서로 맞바꿈 (Swap)
+		const temp = updated[draggedIndex];
+		updated[draggedIndex] = updated[targetIndex];
+		updated[targetIndex] = temp;
+
+		setFlatMembers(updated);
+		setDraggedIndex(null);
+	};
+
+	// 2차원 짝 리스트로 변환
+	const currentPairs: [
+		{ name: string; status: boolean },
+		{ name: string; status: boolean },
+	][] = [];
+	for (let i = 0; i < flatMembers.length; i += 2) {
+		currentPairs.push([
+			flatMembers[i] || { name: '빈자리', status: false },
+			flatMembers[i + 1] || { name: '빈자리', status: false },
+		]);
+	}
 
 	const handleCreateSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -134,12 +252,10 @@ export default function AllocationAddModal({
 
 		setIsCreating(true);
 		try {
-			const generatedOrder = previewPairs.flat();
-
 			const result = await createNewSeatRound(
 				targetRound,
 				roundTitle,
-				generatedOrder,
+				flatMembers.map((m) => (m.status ? m.name : '빈자리')),
 			);
 
 			if (result?.groups) {
@@ -156,18 +272,50 @@ export default function AllocationAddModal({
 
 	return (
 		<div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-			<div className="bg-white w-full max-w-xl rounded-2xl p-6 space-y-5 shadow-2xl max-h-[90vh] flex flex-col">
+			<div className="bg-white w-full max-w-xl rounded-2xl p-6 space-y-4 shadow-2xl max-h-[90vh] flex flex-col">
 				{/* 모달 헤더 */}
 				<div className="flex items-center justify-between border-b pb-3 border-slate-100">
 					<div>
-						<h3 className="text-lg font-bold text-slate-800">새 자리 배정</h3>
+						<h3 className="text-lg font-bold text-slate-800">
+							새 자리 배정 생성
+						</h3>
 						<p className="text-xs text-indigo-600 font-medium">
-							개별 애니메이션 이동 매핑 (마지막 생성: {rounds.length}회차)
+							{isCustomMode
+								? '✏️ 사용자 커스텀 순서 편집 중'
+								: '🔄 자동 링 순환 적용 중'}
 						</p>
 					</div>
-					<span className="text-xs font-semibold px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-full">
-						총 {firstOrder.length}명 / 13개 조
-					</span>
+					<div className="flex items-center gap-2">
+						{/* 마지막 회차 불러오기 버튼 */}
+						<button
+							type="button"
+							onClick={handleLoadLastRoundFromDB}
+							disabled={isLoadingLast}
+							className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition-colors"
+							title="DB의 최신 회차 배정 불러오기"
+						>
+							{isLoadingLast ? (
+								<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" />
+							) : (
+								<RotateCcw className="w-3.5 h-3.5 text-indigo-600" />
+							)}
+							<span>이전 회차 불러오기</span>
+						</button>
+
+						{/* 커스텀 토글 버튼 */}
+						<button
+							type="button"
+							onClick={() => setIsCustomMode(!isCustomMode)}
+							className={`flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors ${
+								isCustomMode
+									? 'bg-indigo-600 text-white border-indigo-600'
+									: 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+							}`}
+						>
+							<Edit3 className="w-3.5 h-3.5" />
+							<span>{isCustomMode ? '자동 링 적용' : '커스텀 수정'}</span>
+						</button>
+					</div>
 				</div>
 
 				<form
@@ -181,30 +329,47 @@ export default function AllocationAddModal({
 								생성할 회차 선택
 							</label>
 							<div className="flex items-center border border-slate-200 rounded-xl overflow-hidden bg-slate-50 focus-within:ring-2 focus-within:ring-indigo-500">
+								{/* 이전 회차 버튼: 커스텀 모드이거나 1회차일 때 disabled */}
 								<button
 									type="button"
 									onClick={() => handleRoundChange(targetRound - 1)}
-									disabled={targetRound <= 1}
-									className="p-2.5 text-slate-600 hover:bg-slate-200 disabled:opacity-30 transition-colors"
+									disabled={isCustomMode || targetRound <= 1}
+									className="p-2.5 text-slate-600 hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+									title={
+										isCustomMode
+											? '커스텀 모드에서는 이전 회차로 이동할 수 없습니다.'
+											: ''
+									}
 								>
 									<ChevronLeft className="w-4 h-4" />
 								</button>
+
 								<div className="flex-1 flex items-center justify-center font-bold text-sm text-indigo-700">
 									<input
 										type="number"
 										min={1}
+										max={isCustomMode ? initialNextRound + 1 : undefined}
 										value={targetRound}
+										disabled={isCustomMode} // 커스텀 모드에서는 direct input 차단
 										onChange={(e) =>
 											handleRoundChange(Number(e.target.value) || 1)
 										}
-										className="w-12 text-center bg-transparent focus:outline-none font-bold"
+										className="w-12 text-center bg-transparent focus:outline-none font-bold disabled:opacity-80"
 									/>
 									<span className="text-xs text-slate-500 -ml-1">회차</span>
 								</div>
+
+								{/* 다음 회차 버튼: 커스텀 모드이고 이미 1회 올라갔으면 disabled */}
 								<button
 									type="button"
 									onClick={() => handleRoundChange(targetRound + 1)}
-									className="p-2.5 text-slate-600 hover:bg-slate-200 transition-colors"
+									disabled={isCustomMode && targetRound >= initialNextRound + 1}
+									className="p-2.5 text-slate-600 hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+									title={
+										isCustomMode && targetRound >= initialNextRound + 1
+											? '커스텀 모드에서는 다음 회차로 1회만 이동 가능합니다.'
+											: ''
+									}
 								>
 									<ChevronRight className="w-4 h-4" />
 								</button>
@@ -225,7 +390,7 @@ export default function AllocationAddModal({
 						</div>
 					</div>
 
-					{/* 3컬럼 리스트 (조 텍스트 고정, 개별 이름 애니메이션) */}
+					{/* 3컬럼 리스트 (드래그 & 삭제 커스텀 지원) */}
 					<div className="bg-slate-50/80 rounded-xl p-3 border border-slate-100 flex-1 flex flex-col min-h-0">
 						{/* 헤더 */}
 						<div className="grid grid-cols-12 text-[11px] font-bold text-slate-400 pb-2 border-b border-slate-200/60 px-2 text-center">
@@ -235,32 +400,79 @@ export default function AllocationAddModal({
 							<div className="col-span-5">첫 번째 사람 (A)</div>
 							<div className="col-span-5">두 번째 사람 (B)</div>
 						</div>
+
 						<div className="flex-1 overflow-y-auto pr-1 pt-1 space-y-1.5">
-							{/* 💡 id를 고정값으로 지정하여 회차가 바뀌어도 레이아웃 변화를 추적하게 합니다 */}
 							<LayoutGroup id="seat-allocation-group">
-								{previewPairs.map(([p1, p2], idx) => (
-									<div
-										key={`group-row-${idx + 1}`}
-										className="grid grid-cols-12 items-center text-xs gap-2 py-0.5 px-1"
-									>
-										{/* 1컬럼: 조 이름 (고정) */}
-										<div className="col-span-2 text-center">
-											<span className="font-mono text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full inline-block">
-												{idx + 1}조
-											</span>
-										</div>
+								{currentPairs.map(([p1, p2], pairIdx) => {
+									const idx1 = pairIdx * 2;
+									const idx2 = pairIdx * 2 + 1;
 
-										{/* 2컬럼: 첫 번째 사람 컴포넌트 (key={p1} 추가) */}
-										<div className="col-span-5 flex justify-center">
-											<NameCard key={p1} name={p1} />
-										</div>
+									return (
+										<div
+											key={`pair-row-${pairIdx}`}
+											className="grid grid-cols-12 items-center text-xs gap-2 py-0.5 px-1"
+										>
+											{/* 1컬럼: 조 이름 */}
+											<div className="col-span-2 text-center">
+												<span className="font-mono text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full inline-block">
+													{pairIdx + 1}조
+												</span>
+											</div>
 
-										{/* 3컬럼: 두 번째 사람 컴포넌트 (key={p2} 추가) */}
-										<div className="col-span-5 flex justify-center">
-											<NameCard key={p2} name={p2} />
+											{/* 2컬럼: 첫 번째 사람 셀 */}
+											<div
+												className="col-span-5 flex items-center gap-1 relative group"
+												draggable={isCustomMode}
+												onDragStart={(e) => handleDragStart(e, idx1)}
+												onDragOver={handleDragOver}
+												onDrop={() => handleDrop(idx1)}
+											>
+												{isCustomMode && (
+													<GripVertical className="w-3.5 h-3.5 text-slate-300 cursor-grab active:cursor-grabbing shrink-0" />
+												)}
+												<div className="flex-1 relative">
+													<NameCard name={p1.name} status={p1.status} />
+													{isCustomMode && p1.status && (
+														<button
+															type="button"
+															onClick={() => handleRemoveMember(idx1)}
+															className="absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+															title="삭제"
+														>
+															<Trash2 className="w-3 h-3" />
+														</button>
+													)}
+												</div>
+											</div>
+
+											{/* 3컬럼: 두 번째 사람 셀 */}
+											<div
+												className="col-span-5 flex items-center gap-1 relative group"
+												draggable={isCustomMode}
+												onDragStart={(e) => handleDragStart(e, idx2)}
+												onDragOver={handleDragOver}
+												onDrop={() => handleDrop(idx2)}
+											>
+												{isCustomMode && (
+													<GripVertical className="w-3.5 h-3.5 text-slate-300 cursor-grab active:cursor-grabbing shrink-0" />
+												)}
+												<div className="flex-1 relative">
+													<NameCard name={p2.name} status={p2.status} />
+													{isCustomMode && p2.status && (
+														<button
+															type="button"
+															onClick={() => handleRemoveMember(idx2)}
+															className="absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+															title="삭제"
+														>
+															<Trash2 className="w-3 h-3" />
+														</button>
+													)}
+												</div>
+											</div>
 										</div>
-									</div>
-								))}
+									);
+								})}
 							</LayoutGroup>
 						</div>
 					</div>
@@ -286,5 +498,29 @@ export default function AllocationAddModal({
 				</form>
 			</div>
 		</div>
+	);
+}
+
+function NameCard({ name, status }: { name: string; status: boolean }) {
+	const isBlank = !status || name === '빈자리';
+
+	return (
+		<motion.div
+			layout="position"
+			layoutId={`person-${name}`}
+			key={`person-${name}`}
+			transition={{
+				type: 'spring',
+				stiffness: 300,
+				damping: 26,
+			}}
+			className={`w-full text-center font-bold py-1.5 rounded-lg text-xs shadow-sm transition-colors select-none ${
+				isBlank
+					? 'bg-slate-100 text-slate-400 border border-dashed border-slate-300'
+					: 'bg-white text-slate-800 border border-slate-200/90 hover:border-indigo-400'
+			}`}
+		>
+			{status ? name : '빈자리'}
+		</motion.div>
 	);
 }
