@@ -1,7 +1,12 @@
 'use client';
 
 import { useState, useTransition, useEffect } from 'react';
-import { updateUserStatus, getAllUsers, resetUserPassword } from './actions';
+import {
+	updateUserStatus,
+	getAllUsers,
+	resetUserPassword,
+	getClasses,
+} from './actions';
 import {
 	ShieldCheck,
 	User,
@@ -19,8 +24,10 @@ interface Profile {
 	id: string;
 	name: string;
 	email: string | null;
-	role: 'super_admin' | 'user';
+	role: 'super_admin' | 'class_admin' | 'user';
 	status: 'active' | 'blocked';
+	class_id: string | null;
+	className?: string; // 클래스 이름 (선택적)
 	created_at: string;
 }
 
@@ -30,7 +37,9 @@ export default function UserManagementTable({
 	initialUsers: Profile[];
 }) {
 	const [users, setUsers] = useState<Profile[]>(initialUsers);
+	const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
 	const [searchTerm, setSearchTerm] = useState('');
+	const [searchClass, setSearchClass] = useState('');
 	const [isPending, startTransition] = useTransition();
 	const [loadingId, setLoadingId] = useState<string | null>(null);
 	const [isResetting, setIsResetting] = useState(false);
@@ -39,13 +48,23 @@ export default function UserManagementTable({
 	// 검색 필터링 (이름/이메일기준)
 	const filteredUsers = users.filter(
 		(u) =>
-			u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-			(u.email && u.email.toLowerCase().includes(searchTerm.toLowerCase())),
+			u.name.includes(searchTerm.toLowerCase()) &&
+			u?.className?.includes(searchClass.toLowerCase()),
 	);
 
 	const fetchUsers = async () => {
 		const users = await getAllUsers();
-		setUsers(users);
+		const classes = await getClasses();
+		setClasses(classes);
+		setUsers(
+			users.map((user) => {
+				return {
+					...user,
+					className:
+						classes.find((cls) => cls.id === user.class_id)?.name ?? '',
+				};
+			}),
+		);
 	};
 	useEffect(() => {
 		// 초기 유저 목록을 가져오는 로직 (예: API 호출)
@@ -55,7 +74,7 @@ export default function UserManagementTable({
 	// 권한 또는 상태 업데이트 핸들러
 	const handleStatusChange = (
 		userId: string,
-		newRole: 'super_admin' | 'user',
+		newRole: 'class_admin' | 'user',
 		newStatus: 'active' | 'blocked',
 	) => {
 		setLoadingId(userId);
@@ -115,6 +134,33 @@ export default function UserManagementTable({
 					/>
 				</div>
 
+				{/* Class 검색 */}
+				<div className="flex flex-wrap gap-2">
+					<button
+						onClick={() => setSearchClass('')}
+						className={`px-3 py-1 text-[11px] font-medium rounded-lg border transition-colors ${
+							searchClass === ''
+								? 'bg-indigo-600 border-indigo-600 text-white'
+								: 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+						}`}
+					>
+						전체
+					</button>
+					{classes.map(({ id, name }) => (
+						<button
+							key={id}
+							onClick={() => setSearchClass(name)}
+							className={`px-3 py-1 text-[11px] font-medium rounded-lg border transition-colors ${
+								searchClass === name
+									? 'bg-indigo-600 border-indigo-600 text-white'
+									: 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+							}`}
+						>
+							{name}
+						</button>
+					))}
+				</div>
+
 				{/* 검색 창 */}
 				<div className="relative w-full sm:w-64">
 					<Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
@@ -133,6 +179,7 @@ export default function UserManagementTable({
 				<table className="w-full text-left border-collapse">
 					<thead>
 						<tr className="bg-slate-50 border-b border-slate-100 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+							<th className="py-3 px-4">반</th>
 							<th className="py-3 px-4">이름</th>
 							<th className="py-3 px-4">Role</th>
 							<th className="py-3 px-4">상태</th>
@@ -149,16 +196,23 @@ export default function UserManagementTable({
 										key={user.id}
 										className="hover:bg-slate-50/80 transition-colors"
 									>
+										<td className="py-3 px-1 font-semibold text-slate-600 items-center min-w-[50px]">
+											{user.className || '미지정'}
+										</td>
 										{/* 이름 */}
-										<td className="py-3 px-2 font-semibold text-slate-900 flex items-center gap-2 min-w-[50px]">
+										<td className="py-3 px-1 font-semibold text-sm text-slate-900 items-center min-w-[50px]">
 											{user.name}
 										</td>
-										{/* 💡 비밀번호 초기화 버튼 */}
 										{/* 권한 뱃지 */}
-										<td className="py-3 px-2">
+										<td className="py-3 px-1">
 											{user.role === 'super_admin' ? (
+												<span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 border border-indigo-200/60 py-0.5 px-1 rounded-full text-[11px] font-semibold">
+													<ShieldCheck className="w-3 h-3 text-indigo-600" />{' '}
+													Admin
+												</span>
+											) : user.role === 'class_admin' ? (
 												<span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200/60 py-0.5 px-1 rounded-full text-[11px] font-semibold">
-													<ShieldCheck className="w-3 h-3 text-amber-600" />{' '}
+													<ShieldCheck className="w-3 h-3 text-amber-600" />C
 													Admin
 												</span>
 											) : (
@@ -169,7 +223,7 @@ export default function UserManagementTable({
 										</td>
 
 										{/* 상태 뱃지 */}
-										<td className="py-3 px-2 min-w-18">
+										<td className="py-3">
 											{user.status === 'active' ? (
 												<span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-md text-[11px] font-medium">
 													<CheckCircle2 className="w-3 h-3" /> 정상
@@ -189,6 +243,7 @@ export default function UserManagementTable({
 												</div>
 											) : (
 												<div className="flex items-center justify-end gap-2">
+													{/* 💡 비밀번호 초기화 버튼 */}
 													<button
 														type="button"
 														onClick={() => {
@@ -201,45 +256,53 @@ export default function UserManagementTable({
 														<KeyRound className="w-3.5 h-3.5" />
 													</button>
 													{/* 권한 토글 버튼 */}
-													<button
-														onClick={() =>
-															handleStatusChange(
-																user.id,
-																user.role === 'super_admin'
-																	? 'user'
-																	: 'super_admin',
-																user.status,
-															)
-														}
-														className={`px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-colors ${
-															user.role === 'super_admin'
-																? 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-																: 'bg-amber-500 border-amber-500 text-white hover:bg-amber-600'
-														}`}
-														disabled={user.name === '정인호'} // 정인호 계정은 권한 변경 불가
-													>
-														{user.role === 'super_admin'
-															? 'User로 변경'
-															: 'Admin 지정'}
-													</button>
-
-													{/* 차단 토글 버튼 */}
-													<button
-														onClick={() =>
-															handleStatusChange(
-																user.id,
-																user.role,
-																user.status === 'active' ? 'blocked' : 'active',
-															)
-														}
-														className={`px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-colors ${
-															user.status === 'active'
-																? 'bg-white border-rose-200 text-rose-600 hover:bg-rose-50'
-																: 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700'
-														}`}
-													>
-														{user.status === 'active' ? '차단' : '차단 해제'}
-													</button>
+													{user.role !== 'super_admin' && (
+														<>
+															<button
+																onClick={() =>
+																	handleStatusChange(
+																		user.id,
+																		user.role === 'class_admin'
+																			? 'user'
+																			: 'class_admin',
+																		user.status,
+																	)
+																}
+																className={`px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-colors ${
+																	user.role === 'class_admin'
+																		? 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+																		: 'bg-amber-500 border-amber-500 text-white hover:bg-amber-600'
+																}`}
+															>
+																{user.role === 'class_admin'
+																	? 'User로 변경'
+																	: 'Admin 지정'}
+															</button>
+															{/* 차단 토글 버튼 */}
+															<button
+																onClick={() =>
+																	handleStatusChange(
+																		user.id,
+																		user.role === 'super_admin'
+																			? 'class_admin'
+																			: user.role,
+																		user.status === 'active'
+																			? 'blocked'
+																			: 'active',
+																	)
+																}
+																className={`px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-colors ${
+																	user.status === 'active'
+																		? 'bg-white border-rose-200 text-rose-600 hover:bg-rose-50'
+																		: 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700'
+																}`}
+															>
+																{user.status === 'active'
+																	? '차단'
+																	: '차단 해제'}
+															</button>
+														</>
+													)}
 												</div>
 											)}
 										</td>

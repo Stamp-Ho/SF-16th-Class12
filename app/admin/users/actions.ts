@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 
 function getVirtualEmail(name: string) {
 	const hexName = Buffer.from(name.trim()).toString('hex');
-	return `ssafy504_${hexName}@ssafy.local`;
+	return `ssafy16_${hexName}@ssafy.local`;
 }
 
 // 1. Comma-separated 회원 일괄 등록
@@ -26,7 +26,7 @@ export async function bulkRegisterUsers(commaSeparatedNames: string) {
 		// signUp 대신 admin.createUser 사용
 		const { data, error } = await supabaseAdmin.auth.admin.createUser({
 			email: virtualEmail,
-			password: 'ssafy504',
+			password: 'ssafy16',
 			email_confirm: true, // 이메일 인증 완료 상태로 설정 (메일 미발송)
 			user_metadata: { name, email: virtualEmail }, // Supabase Trigger(handle_new_user)로 profiles에 name 자동 삽입
 		});
@@ -53,7 +53,7 @@ export async function getAllUsers() {
 
 	const { data: users, error } = await supabase
 		.from('profiles')
-		.select('id, name, email, role, status, created_at')
+		.select('id, name, email, role, status, created_at, class_id')
 		.order('name', { ascending: true });
 	console.log('getAllUsers:', users, error);
 
@@ -67,7 +67,7 @@ export async function getAllUsers() {
 // 2. 유저 권한 및 상태 변경 (Admin 전용)
 export async function updateUserStatus(
 	userId: string,
-	role: 'super_admin' | 'user',
+	role: 'class_admin' | 'user',
 	status: 'active' | 'blocked',
 ) {
 	const supabaseAdmin = createAdminClient();
@@ -102,4 +102,53 @@ export async function resetUserPassword(userId: string, newPassword: string) {
 	}
 
 	return { success: true };
+}
+
+export async function getClasses() {
+	const supabase = createAdminClient();
+	const { data: classes, error } = await supabase
+		.from('classes')
+		.select('id, name')
+		.order('name', { ascending: true });
+	if (error) {
+		throw new Error(`반 목록 조회 실패: ${error.message}`);
+	}
+	return classes || [];
+}
+
+// Class 생성 및 Class Admin 계정 생성 (Admin 전용)
+export async function registerClassAdmin(className: string, userName: string) {
+	const supabaseAdmin = createAdminClient();
+	supabaseAdmin.auth.admin
+		.createUser({
+			email: getVirtualEmail(userName),
+			password: 'ssafy16',
+			email_confirm: true,
+			user_metadata: { name: userName, email: getVirtualEmail(userName) },
+		})
+		.then(async ({ data, error }) => {
+			if (error || !data.user) {
+				throw new Error(`클래스 관리자 계정 생성 실패: ${error?.message}`);
+			}
+			// 1. Class 생성
+			const { data: classData, error: classError } = await supabaseAdmin
+				.from('classes')
+				.insert({ name: className })
+				.select('id')
+				.single();
+			if (classError || !classData) {
+				throw new Error(`클래스 생성 실패: ${classError?.message}`);
+			}
+
+			// 2. Class Admin 계정에 class_id 업데이트
+			const { error: updateError } = await supabaseAdmin
+				.from('profiles')
+				.update({ class_id: classData.id, role: 'class_admin' })
+				.eq('id', data.user.id);
+			if (updateError) {
+				throw new Error(
+					`클래스 관리자 계정 업데이트 실패: ${updateError.message}`,
+				);
+			}
+		});
 }
