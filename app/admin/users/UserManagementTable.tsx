@@ -19,7 +19,7 @@ interface Profile {
 	id: string;
 	name: string;
 	email: string | null;
-	role: 'admin' | 'user';
+	role: 'super_admin' | 'user';
 	status: 'active' | 'blocked';
 	created_at: string;
 }
@@ -55,7 +55,7 @@ export default function UserManagementTable({
 	// 권한 또는 상태 업데이트 핸들러
 	const handleStatusChange = (
 		userId: string,
-		newRole: 'admin' | 'user',
+		newRole: 'super_admin' | 'user',
 		newStatus: 'active' | 'blocked',
 	) => {
 		setLoadingId(userId);
@@ -156,7 +156,7 @@ export default function UserManagementTable({
 										{/* 💡 비밀번호 초기화 버튼 */}
 										{/* 권한 뱃지 */}
 										<td className="py-3 px-2">
-											{user.role === 'admin' ? (
+											{user.role === 'super_admin' ? (
 												<span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200/60 py-0.5 px-1 rounded-full text-[11px] font-semibold">
 													<ShieldCheck className="w-3 h-3 text-amber-600" />{' '}
 													Admin
@@ -205,18 +205,20 @@ export default function UserManagementTable({
 														onClick={() =>
 															handleStatusChange(
 																user.id,
-																user.role === 'admin' ? 'user' : 'admin',
+																user.role === 'super_admin'
+																	? 'user'
+																	: 'super_admin',
 																user.status,
 															)
 														}
 														className={`px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-colors ${
-															user.role === 'admin'
+															user.role === 'super_admin'
 																? 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
 																: 'bg-amber-500 border-amber-500 text-white hover:bg-amber-600'
 														}`}
 														disabled={user.name === '정인호'} // 정인호 계정은 권한 변경 불가
 													>
-														{user.role === 'admin'
+														{user.role === 'super_admin'
 															? 'User로 변경'
 															: 'Admin 지정'}
 													</button>

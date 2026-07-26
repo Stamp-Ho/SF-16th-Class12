@@ -89,7 +89,7 @@ export default function SeatAuctionPage() {
 			if (profile) {
 				setCurrentUser({
 					name: profile.name,
-					isAdmin: profile.role === 'admin',
+					isAdmin: profile.role === 'super_admin',
 				});
 			}
 		} catch (err) {

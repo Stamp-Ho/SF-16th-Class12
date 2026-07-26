@@ -32,7 +32,7 @@ export default async function MainPage() {
 		.eq('id', user.id)
 		.single();
 
-	const isAdmin = profile?.role === 'admin';
+	const isAdmin = profile?.role === 'super_admin';
 
 	// 3. 공지/링크 목록 조회
 	const { data: links } = await supabase
