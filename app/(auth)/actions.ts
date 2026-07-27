@@ -17,6 +17,7 @@ export async function getUsers(classId: string) {
 }
 
 export async function loginWithName(formData: FormData) {
+  const classId = formData.get("classId") as string;
   const name = formData.get("name") as string;
   const password = formData.get("password") as string;
 
@@ -30,12 +31,12 @@ export async function loginWithName(formData: FormData) {
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("email")
+    .eq("class_id", classId.trim())
     .eq("name", name.trim())
     .single();
-
   if (profileError || !profile || !profile.email) {
     return {
-      error: "등록되지 않은 이름입니다. 이름이 정확한지 확인해 주세요."
+      error: "반과 이름이 정확한지 확인해 주세요."
     };
   }
 

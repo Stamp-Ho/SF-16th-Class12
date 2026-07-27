@@ -11,6 +11,7 @@ function getVirtualEmail(name: string) {
 // 1. Comma-separated 회원 일괄 등록
 export async function bulkRegisterUsers(
   commaSeparatedNames: string,
+  className: string,
   classId: string
 ) {
   // 💡 세션을 변경하지 않는 Admin 전용 클라이언트 사용
@@ -24,7 +25,7 @@ export async function bulkRegisterUsers(
   const results = { successCount: 0, failCount: 0, errors: [] as string[] };
 
   for (const name of names) {
-    const virtualEmail = getVirtualEmail(name);
+    const virtualEmail = getVirtualEmail(className + name);
 
     // signUp 대신 admin.createUser 사용
     const { data, error } = await supabaseAdmin.auth.admin.createUser({

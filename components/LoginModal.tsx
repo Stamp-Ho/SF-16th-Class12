@@ -1,19 +1,43 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
+import { createClient } from "@/utils/supabase/client";
 import { loginWithName } from "@/app/(auth)/actions";
 import { LogIn, Loader2, Lock, User } from "lucide-react";
 
 export default function LoginModal() {
   const [isPending, startTransition] = useTransition();
   const [errorMessage, setErrorMessage] = useState("");
+  const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
+
+  const fetchClasses = async () => {
+    const supabase = createClient();
+    const { data: classes, error } = await supabase
+      .from("classes")
+      .select("id, name")
+      .order("name", { ascending: true });
+    if (error) {
+      throw new Error(`반 목록 조회 실패: ${error.message}`);
+    }
+    return classes || [];
+  };
+
+  useEffect(() => {
+    startTransition(async () => {
+      try {
+        const fetchedClasses = await fetchClasses();
+        setClasses(fetchedClasses);
+      } catch (err: any) {
+        setErrorMessage(`반 목록 조회 실패: ${err.message}`);
+      }
+    });
+  }, []);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMessage("");
 
     const formData = new FormData(e.currentTarget);
-
     startTransition(async () => {
       const result = await loginWithName(formData);
       if (result?.error) {
@@ -38,6 +62,19 @@ export default function LoginModal() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* 반 선택 필드 */}
+          <select
+            name="classId"
+            className="w-full text-sm px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+            required
+          >
+            <option value="">반을 선택하세요</option>
+            {classes.map((cls) => (
+              <option key={cls.id} value={cls.id}>
+                {cls.name}
+              </option>
+            ))}
+          </select>
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1">
               이름

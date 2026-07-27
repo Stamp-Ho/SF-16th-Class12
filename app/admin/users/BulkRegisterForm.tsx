@@ -23,7 +23,11 @@ export default function BulkRegisterForm({
 
     startTransition(async () => {
       try {
-        const res = await bulkRegisterUsers(userNames, classInfo.id);
+        const res = await bulkRegisterUsers(
+          userNames,
+          classInfo.name,
+          classInfo.id
+        );
         setUserMessage(
           `성공: ${res.successCount}명 / 실패: ${res.failCount}명`
         );
