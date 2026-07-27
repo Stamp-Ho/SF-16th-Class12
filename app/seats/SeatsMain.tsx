@@ -54,7 +54,8 @@ export default function SeatsMain({ classId }: { classId: string }) {
             currentCode &&
             updatedSeat.seat_code === currentCode &&
             updatedSeat.current_group_id !== currentGroupId &&
-            updatedSeat.current_group_id !== null
+            updatedSeat.current_group_id !== null &&
+            updatedSeat.round_number === selectedRound?.roundNumber
           ) {
             alert(
               `⚠️ [경고] ${updatedSeat.seat_code}구역 자리를 다른 팀이 상향 입찰하여 뺏어갔습니다!`
