@@ -18,7 +18,7 @@ export async function bulkRegisterUsers(
   const supabaseAdmin = createAdminClient();
 
   const names = commaSeparatedNames
-    .split(",")
+    .split(/[\s,]+/) // 공백(스페이스, 엔터, 탭) 및 쉼표를 기준으로 자름
     .map((name) => name.trim())
     .filter(Boolean);
 
