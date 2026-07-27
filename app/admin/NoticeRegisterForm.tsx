@@ -4,7 +4,11 @@ import { useState, useTransition } from "react";
 import { BookmarkPlus, Loader2, CheckCircle2 } from "lucide-react";
 import { createDashboardLink } from "./links/actions";
 
-export default function NoticeRegisterForm() {
+export default function NoticeRegisterForm({
+  classId
+}: {
+  classId: string | null;
+}) {
   const [isPending, startTransition] = useTransition();
 
   const [linkTitle, setLinkTitle] = useState("");
@@ -22,7 +26,8 @@ export default function NoticeRegisterForm() {
         await createDashboardLink({
           title: linkTitle,
           url: linkUrl,
-          description: linkDesc
+          description: linkDesc,
+          class_id: classId
         });
         setLinkMessage("새로운 링크가 추가되었습니다.");
         setLinkTitle("");

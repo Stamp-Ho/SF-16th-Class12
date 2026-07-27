@@ -4,6 +4,18 @@
 import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 
+export async function getUsers(classId: string) {
+  const supabase = await createClient();
+  const { data: users, error } = await supabase
+    .from("profiles")
+    .select("id, name, email, class_id")
+    .eq("class_id", classId);
+  if (error) {
+    throw new Error(`Failed to fetch users: ${error.message}`);
+  }
+  return users.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export async function loginWithName(formData: FormData) {
   const name = formData.get("name") as string;
   const password = formData.get("password") as string;

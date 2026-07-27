@@ -9,6 +9,7 @@ export async function createDashboardLink(formData: {
   url: string;
   description?: string;
   display_order?: number;
+  class_id?: string | null;
 }) {
   const supabase = await createClient();
 
@@ -16,7 +17,8 @@ export async function createDashboardLink(formData: {
     title: formData.title,
     url: formData.url,
     description: formData.description || "",
-    display_order: formData.display_order || 0
+    display_order: formData.display_order || 0,
+    class_id: formData.class_id || null
   });
 
   if (error) throw new Error(error.message);
