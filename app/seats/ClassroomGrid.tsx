@@ -114,7 +114,7 @@ export default function ClassroomGrid({
 
   useEffect(()=>{
     let result = 0;
-    seatList.foreach((s)=> result += seatList.current_bid_price);
+    seatList.forEach((s)=> result += seatList.current_bid_price);
     setTotalCost(result);
   },[seatList]);
   const getSeatInfo = (code: string) =>
