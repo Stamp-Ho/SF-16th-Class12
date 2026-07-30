@@ -218,7 +218,7 @@ export default function ClassroomGrid({
         </div>
         <div className="flex justify-between">
           <div className = "w-48 bg-violet-50 border-2 border-violet-300 text-violet-900 py-2.5 rounded-xl font-bold text-xs text-center">
-            총액: {(totalCost * 2).toLocaleString()}원
+            총액: {(tatalCost * 2).toLocaleString()}원
           </div>
           <div className="w-48 bg-amber-50 border-2 border-amber-300 text-amber-900 py-2.5 rounded-xl font-bold text-xs text-center">
             강사님 자~리
