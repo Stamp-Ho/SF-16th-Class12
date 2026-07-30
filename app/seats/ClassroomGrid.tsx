@@ -110,7 +110,13 @@ export default function ClassroomGrid({
   const [isPending, startTransition] = useTransition();
   // 💡 드래그 중인 타일의 시각적 피드백 상태 (드롭 호버 중인 구역 코드)
   const [dragOverCode, setDragOverCode] = useState<string | null>(null);
+  const [tatalCost, setTotalCost] = useState<number>(0);
 
+  useEffect(()=>{
+    let result = 0;
+    seatList.foreach((s)=> result += seatList.current_bid_price);
+    setTotalCost(result);
+  },[seatList]);
   const getSeatInfo = (code: string) =>
     seatList.find((s) => s.seat_code === code);
 
@@ -210,7 +216,10 @@ export default function ClassroomGrid({
             <Sparkles className="w-4 h-4 text-amber-400" /> 칠판 (스크린)
           </div>
         </div>
-        <div className="flex justify-end">
+        <div className="flex justify-between">
+          <div className = "w-48 bg-violet-50 border-2 border-violet-300 text-violet-900 py-2.5 rounded-xl font-bold text-xs text-center">
+            총액: {tatalCost}원
+          </div>
           <div className="w-48 bg-amber-50 border-2 border-amber-300 text-amber-900 py-2.5 rounded-xl font-bold text-xs text-center">
             강사님 자~리
           </div>
