@@ -3,6 +3,8 @@
 :root {
 	--background: #ffffff;
 	--foreground: #171717;
+	--ssafy-blue: #6dc4e8;
+	--ssafy-blue-dark: #4aa0c7;
 }
 
 @theme inline {
@@ -10,12 +12,16 @@
 	--color-foreground: var(--foreground);
 	--font-sans: var(--font-geist-sans);
 	--font-mono: var(--font-geist-mono);
+
+	--color-ssafy-blue: var(--ssafy-blue);
+	--color-ssafy-blue-dark: var(--ssafy-blue-dark);
 }
 
 @media (prefers-color-scheme: dark) {
 	:root {
 		--background: #0a0a0a;
 		--foreground: #ededed;
+		--ssafy-blue: #6dc4e8;
 	}
 }
 
@@ -26,6 +32,10 @@ body {
 }
 button {
 	cursor: pointer;
+}
+strong {
+	color: var(--ssafy-blue);
+	font-weight: 600;
 }
 /* ==========================================================================
    글로벌 커스텀 스크롤바 스타일 (Webkit & Firefox)
