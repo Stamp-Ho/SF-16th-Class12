@@ -88,7 +88,7 @@ export default function SongMain({
     }
   };
 
-  const isAdmin = user.role.includes("admin");
+  const isAdmin = user.role.includes("song_admin");
 
   return (
     <main className="min-h-screen bg-slate-50/80 p-4 sm:p-6 md:p-12 font-sans">

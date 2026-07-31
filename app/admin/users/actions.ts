@@ -78,7 +78,7 @@ export async function getAllUsers(classId?: string | null) {
 // 2. 유저 권한 및 상태 변경 (Admin 전용)
 export async function updateUserStatus(
   userId: string,
-  role: "class_admin" | "user",
+  role: "class_admin" | "user" | "song_admin",
   status: "active" | "blocked"
 ) {
   const supabaseAdmin = createAdminClient();

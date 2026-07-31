@@ -26,7 +26,7 @@ interface Profile {
   id: string;
   name: string;
   email: string | null;
-  role: "super_admin" | "class_admin" | "user";
+  role: "super_admin" | "class_admin" | "user" | "song_admin";
   status: "active" | "blocked";
   class_id: string | null;
   className?: string; // 클래스 이름 (선택적)
@@ -40,7 +40,7 @@ export default function UserManagementTable({
   classId
 }: {
   initialUsers: Profile[];
-  userRole?: "super_admin" | "class_admin" | "user";
+  userRole?: "super_admin" | "class_admin" | "user" | "song_admin";
   myId?: string;
   classId: string | null;
 }) {
@@ -91,7 +91,7 @@ export default function UserManagementTable({
   // 권한 또는 상태 업데이트 핸들러
   const handleStatusChange = (
     userId: string,
-    newRole: "class_admin" | "user",
+    newRole: "class_admin" | "user" | "song_admin",
     newStatus: "active" | "blocked"
   ) => {
     setLoadingId(userId);
@@ -323,53 +323,55 @@ export default function UserManagementTable({
                             <KeyRound className="w-3.5 h-3.5" />
                           </button>
                           {/* 권한 토글 버튼 */}
-                          {user.id !== myId && user.role !== "super_admin" && (
-                            <>
-                              <button
-                                onClick={() =>
-                                  handleStatusChange(
-                                    user.id,
+                          {user.id !== myId &&
+                            user.role !== "super_admin" &&
+                            user.role !== "song_admin" && (
+                              <>
+                                <button
+                                  onClick={() =>
+                                    handleStatusChange(
+                                      user.id,
+                                      user.role === "class_admin"
+                                        ? "user"
+                                        : "class_admin",
+                                      user.status
+                                    )
+                                  }
+                                  className={`px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-colors ${
                                     user.role === "class_admin"
-                                      ? "user"
-                                      : "class_admin",
-                                    user.status
-                                  )
-                                }
-                                className={`px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-colors ${
-                                  user.role === "class_admin"
-                                    ? "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                                    : "bg-amber-500 border-amber-500 text-white hover:bg-amber-600"
-                                }`}
-                              >
-                                {user.role === "class_admin"
-                                  ? "User로 변경"
-                                  : "Admin 지정"}
-                              </button>
-                              {/* 차단 토글 버튼 */}
-                              <button
-                                onClick={() =>
-                                  handleStatusChange(
-                                    user.id,
-                                    user.role === "super_admin"
-                                      ? "class_admin"
-                                      : user.role,
+                                      ? "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                                      : "bg-amber-500 border-amber-500 text-white hover:bg-amber-600"
+                                  }`}
+                                >
+                                  {user.role === "class_admin"
+                                    ? "User로 변경"
+                                    : "Admin 지정"}
+                                </button>
+                                {/* 차단 토글 버튼 */}
+                                <button
+                                  onClick={() =>
+                                    handleStatusChange(
+                                      user.id,
+                                      user.role === "super_admin"
+                                        ? "class_admin"
+                                        : user.role,
+                                      user.status === "active"
+                                        ? "blocked"
+                                        : "active"
+                                    )
+                                  }
+                                  className={`px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-colors ${
                                     user.status === "active"
-                                      ? "blocked"
-                                      : "active"
-                                  )
-                                }
-                                className={`px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-colors ${
-                                  user.status === "active"
-                                    ? "bg-white border-rose-200 text-rose-600 hover:bg-rose-50"
-                                    : "bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700"
-                                }`}
-                              >
-                                {user.status === "active"
-                                  ? "차단"
-                                  : "차단 해제"}
-                              </button>
-                            </>
-                          )}
+                                      ? "bg-white border-rose-200 text-rose-600 hover:bg-rose-50"
+                                      : "bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700"
+                                  }`}
+                                >
+                                  {user.status === "active"
+                                    ? "차단"
+                                    : "차단 해제"}
+                                </button>
+                              </>
+                            )}
                         </div>
                       )}
                     </td>

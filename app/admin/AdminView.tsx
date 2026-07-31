@@ -8,7 +8,7 @@ export default function AdminView({
   myId,
   classId
 }: {
-  role: "super_admin" | "class_admin" | "user";
+  role: "super_admin" | "class_admin" | "user" | "song_admin";
   myId?: string;
   classId: string | null;
 }) {
