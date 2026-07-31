@@ -152,7 +152,7 @@ export async function startTopSongRecord({
 }
 
 /** 5. 가장 앞의 노래 종료/완료 처리 (Pop Front) */
-export async function completeSongRecord(id: string, classId: number) {
+export async function completeSongRecord(id: string, classId: string) {
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -171,7 +171,7 @@ export async function completeSongRecord(id: string, classId: number) {
 }
 
 /** 6. 기록 삭제 대신 cancel 처리 */
-export async function cancelSongRecord(id: string, classId: number) {
+export async function cancelSongRecord(id: string, classId: string) {
   const supabase = await createClient();
 
   const { data, error } = await supabase
