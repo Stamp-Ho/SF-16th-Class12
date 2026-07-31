@@ -128,7 +128,7 @@ export default async function MainPage() {
                 </span>
                 <h2 className="text-2xl font-bold mt-3">노래 큐</h2>
                 <p className="text-teal-100 text-sm mt-1">
-                  {classInfo?.name} 반의 노래방
+                  {classInfo?.name}의 노래방
                 </p>
               </div>
               <MicVocal className="w-10 h-10 text-indigo-100 group-hover:scale-110 transition-transform" />
