@@ -26,7 +26,7 @@ export default function StagePage({
   user
 }: {
   stageData: any;
-  user: { name: string; role: string; classId: number };
+  user: { name: string; role: string; classId: string };
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [player, setPlayer] = useState<YouTubePlayer | null>(null);

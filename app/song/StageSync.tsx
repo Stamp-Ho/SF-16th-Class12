@@ -10,7 +10,7 @@ export default function StageSync({
   user
 }: {
   initialStageData: any | null;
-  user: { name: string; role: string; classId: number };
+  user: { name: string; role: string; classId: string };
 }) {
   const [stageData, setStageData] = useState<any | null>(initialStageData);
   const supabase = createClient();
