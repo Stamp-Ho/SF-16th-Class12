@@ -112,34 +112,41 @@ export default function ClassroomGrid({
   const [dragOverCode, setDragOverCode] = useState<string | null>(null);
   const [tatalCost, setTotalCost] = useState<number>(0);
 
-  useEffect(()=>{
+  useEffect(() => {
     let result = 0;
-    seatList.forEach((s)=> result += s.current_bid_price);
+    seatList.forEach((s) => (result += s.current_bid_price));
     setTotalCost(result);
-  },[seatList]);
+  }, [seatList]);
   const getSeatInfo = (code: string) =>
     seatList.find((s) => s.seat_code === code);
 
   // 클릭 입찰 함수
-  const handleSeatClick = async (code: string) => {
-    const res = await placeOrMoveSeatBid(
-      roundNumber,
-      code,
-      myGroupId,
-      myGroupName,
-      classId
-    );
+  const handleSeatClick = (code: string) => {
+    // 이미 트랜지션 처리 중이면 중복 요청 차단
+    if (isPending) return;
 
-    if (!res.success) {
-      alert(res.error);
+    startTransition(async () => {
+      const res = await placeOrMoveSeatBid(
+        roundNumber,
+        code,
+        myGroupId,
+        myGroupName,
+        classId
+      );
+
+      if (!res.success) {
+        alert(res.error);
+        loadData();
+        return;
+      }
+
+      if (res.message) {
+        alert(res.message);
+      }
+
+      // 필요한 데이터 갱신
       loadData();
-      return;
-    }
-
-    if (res.message) {
-      alert(res.message);
-    }
-    // 배치 후 데이터 새로고침
+    });
   };
 
   // 💡 드래그 앤 드롭 전용 입찰/배정 처리 함수
@@ -217,7 +224,7 @@ export default function ClassroomGrid({
           </div>
         </div>
         <div className="flex justify-between">
-          <div className = "w-48 bg-violet-50 border-2 border-violet-300 text-violet-900 py-2.5 rounded-xl font-bold text-xs text-center">
+          <div className="w-48 bg-violet-50 border-2 border-violet-300 text-violet-900 py-2.5 rounded-xl font-bold text-xs text-center">
             총액: {(tatalCost * 2).toLocaleString()}원
           </div>
           <div className="w-48 bg-amber-50 border-2 border-amber-300 text-amber-900 py-2.5 rounded-xl font-bold text-xs text-center">

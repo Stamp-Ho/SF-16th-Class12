@@ -118,7 +118,7 @@ export default async function MainPage() {
           </Link>
 
           <Link
-            href="/"
+            href="/song"
             className="group bg-linear-to-br from-ssafy-blue to-ssafy-blue-dark text-white p-6 rounded-2xl shadow-md hover:shadow-lg transition-all"
           >
             <div className="flex justify-between items-start">
