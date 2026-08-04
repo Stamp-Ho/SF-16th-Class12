@@ -14,9 +14,9 @@ import {
   GripVertical
 } from "lucide-react";
 import { LayoutGroup, motion } from "framer-motion";
-import ImportShuffleModal from "./ImportShuffleMdoal";
-import { getUsers } from "@/app/(auth)/actions";
+import ImportShuffleModal from "./ImportShuffleMdoal"; 
 import { generateRingOrder, generateReverseRingOrder } from "./utils/order";
+import { getTargetUsers } from "../shuffle/actions";
 
 interface AllocationAddModalProps {
   onClose: () => void;
@@ -74,16 +74,16 @@ export default function AllocationAddModal({
 
   useEffect(() => {
     const getProfiles = async () => {
-      const profiles = await getUsers(classId);
+      const profiles = await getTargetUsers(classId);
       if (profiles.length % 2 == 1)
-        profiles.push({ name: "빈자리", id: "empty", email: "", class_id: "" });
+        profiles.push({ name: "빈자리", id: "empty", role: "user" });
       setFlatMembers(
         profiles.map((p) => ({
           name: p.name,
           status: p.name == "빈자리" ? false : true
         }))
       );
-      setFirstOrder(profiles.map((p) => p.name));
+      setFirstOrder(profiles.map((p) => p?.name));
 
       setRingOrder(generateRingOrder(profiles.length));
       console.log(generateRingOrder(profiles.length));

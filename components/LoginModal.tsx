@@ -65,6 +65,7 @@ export default function LoginModal() {
           {/* 반 선택 필드 */}
           <select
             name="classId"
+            value={classes.find((c) => c.name.includes("서울 12반"))?.id ?? ""}
             className="w-full text-sm px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
             required
           >

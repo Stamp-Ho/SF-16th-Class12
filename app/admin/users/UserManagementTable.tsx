@@ -120,7 +120,7 @@ export default function UserManagementTable({
       return;
     }
     try {
-      await resetUserPassword(resetTargetUser.id, "ssafy504");
+      await resetUserPassword(resetTargetUser.id, "ssafy16");
       alert(
         `[${resetTargetUser?.name}] 님의 비밀번호가 성공적으로 변경되었습니다.`
       );

@@ -9,13 +9,13 @@ export async function getTargetUsers(classId: string) {
 
   const { data: profiles, error } = await supabase
     .from("profiles")
-    .select("id, name")
+    .select("id, name, role")
     .eq("status", "active")
     .eq("class_id", classId || "")
     .order("name", { ascending: true });
 
   if (error) throw new Error(`유저 목록 조회 실패: ${error.message}`);
-  return profiles || [];
+  return profiles.filter(profile => profile.role !== "teacher");
 }
 
 // 2. 추첨 결과 DB 저장 (JSONB 통째 저장)

@@ -48,7 +48,7 @@ export default function StagePage({
   const [chatInput, setChatInput] = useState("");
   const [nickName, setNickName] = useState(user.name);
 
-  const isAdmin = user.role.includes("admin");
+  const isAdmin = user.role.includes("song") || user.role.includes("teacher");
 
   const onPlayerReady: YouTubeProps["onReady"] = (event) => {
     setPlayer(event.target);
