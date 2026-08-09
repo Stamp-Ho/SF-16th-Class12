@@ -1,136 +1,149 @@
-"use client";
+'use client';
 
-import { useTransition } from "react";
+import { useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import {
-  toggleAuctionStatus,
-  assignUnallocatedGroupsRandomly,
-  deleteSeatRound
-} from "./actions";
+	toggleAuctionStatus,
+	assignUnallocatedGroupsRandomly,
+	deleteSeatRound,
+} from './actions';
 import {
-  Lock,
-  Unlock,
-  Shuffle,
-  ShieldCheck,
-  Loader2,
-  Trash2
-} from "lucide-react";
+	Lock,
+	Unlock,
+	Shuffle,
+	ShieldCheck,
+	Loader2,
+	Trash2,
+} from 'lucide-react';
 
 export default function AdminControlPanel({
-  roundNumber,
-  isClosed,
-  loadData,
-  classId
+	roundNumber,
+	isClosed,
+	loadData,
+	classId,
 }: {
-  roundNumber: number;
-  isClosed: boolean;
-  loadData: () => Promise<void>;
-  classId: string;
+	roundNumber: number;
+	isClosed: boolean;
+	loadData: () => Promise<void>;
+	classId: string;
 }) {
-  const [isPending, startTransition] = useTransition();
+	const [isPending, startTransition] = useTransition();
+	const router = useRouter();
 
-  // 1. 경매 마감 / 시작 토글
-  const handleToggleStatus = () => {
-    startTransition(async () => {
-      await toggleAuctionStatus(roundNumber, !isClosed, classId);
-    });
-  };
+	const refreshAuctionState = async () => {
+		await loadData();
+		router.refresh();
+	};
 
-  // 2. 미배정 그룹 랜덤 일괄 배치
+	// 1. 경매 마감 / 시작 토글
+	const handleToggleStatus = () => {
+		startTransition(async () => {
+			try {
+				await toggleAuctionStatus(roundNumber, !isClosed, classId);
+				await refreshAuctionState();
+			} catch (err: any) {
+				alert(`상태 변경 에러: ${err.message}`);
+			}
+		});
+	};
 
-  const handleRandomAssign = () => {
-    if (
-      !confirm(
-        "자리를 잡지 못한 그룹들을 남은 빈 구역에 무작위로 배치하시겠습니까?"
-      )
-    )
-      return;
+	// 2. 미배정 그룹 랜덤 일괄 배치
 
-    startTransition(async () => {
-      try {
-        // 💡 roundNumber만 전달하면 서버가 알아서 미배정 짝을 찾아 매핑합니다!
-        await assignUnallocatedGroupsRandomly(roundNumber, classId);
-        alert("미배정 그룹 배치가 완료되었습니다!");
-      } catch (err: any) {
-        alert(`배치 에러: ${err.message}`);
-      }
-    });
-  };
+	const handleRandomAssign = () => {
+		if (
+			!confirm(
+				'자리를 잡지 못한 그룹들을 남은 빈 구역에 무작위로 배치하시겠습니까?',
+			)
+		)
+			return;
 
-  return (
-    <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4">
-      <div className="flex items-center gap-3">
-        <ShieldCheck className="w-6 h-6 text-amber-400 shrink-0" />
-        <div>
-          <h3 className="font-bold text-sm">관리자 경매 컨트롤 센터</h3>
-          <p className="text-xs text-slate-400">
-            현재 상태:{" "}
-            <span
-              className={
-                isClosed
-                  ? "text-rose-400 font-bold"
-                  : "text-emerald-400 font-bold"
-              }
-            >
-              {isClosed ? "경매 마감됨" : "경매 진행 중"}
-            </span>
-          </p>
-        </div>
-      </div>
+		startTransition(async () => {
+			try {
+				// 💡 roundNumber만 전달하면 서버가 알아서 미배정 짝을 찾아 매핑합니다!
+				await assignUnallocatedGroupsRandomly(roundNumber, classId);
+				await refreshAuctionState();
+				alert('미배정 그룹 배치가 완료되었습니다!');
+			} catch (err: any) {
+				alert(`배치 에러: ${err.message}`);
+			}
+		});
+	};
 
-      <div className="flex items-center gap-3 w-full sm:w-auto">
-        {/* 상태 변경 버튼 */}
-        <button
-          onClick={handleToggleStatus}
-          disabled={isPending}
-          className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            isClosed
-              ? "bg-emerald-600 hover:bg-emerald-500 text-white"
-              : "bg-rose-600 hover:bg-rose-500 text-white"
-          }`}
-        >
-          {isPending ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : isClosed ? (
-            <>
-              <Unlock className="w-3.5 h-3.5" /> 경매 재개하기
-            </>
-          ) : (
-            <>
-              <Lock className="w-3.5 h-3.5" /> 경매 종료하기
-            </>
-          )}
-        </button>
+	return (
+		<div className="bg-slate-900 text-white p-5 rounded-2xl shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4">
+			<div className="flex items-center gap-3">
+				<ShieldCheck className="w-6 h-6 text-amber-400 shrink-0" />
+				<div>
+					<h3 className="font-bold text-sm">관리자 경매 컨트롤 센터</h3>
+					<p className="text-xs text-slate-400">
+						현재 상태:{' '}
+						<span
+							className={
+								isClosed
+									? 'text-rose-400 font-bold'
+									: 'text-emerald-400 font-bold'
+							}
+						>
+							{isClosed ? '경매 마감됨' : '경매 진행 중'}
+						</span>
+					</p>
+				</div>
+			</div>
 
-        {/* 미배정 그룹 랜덤 배치 버튼 */}
-        <button
-          onClick={handleRandomAssign}
-          disabled={isPending}
-          className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold transition-all"
-        >
-          <Shuffle className="w-3.5 h-3.5" /> 미배정 그룹 랜덤 배치
-        </button>
+			<div className="flex items-center gap-3 w-full sm:w-auto">
+				{/* 상태 변경 버튼 */}
+				<button
+					onClick={handleToggleStatus}
+					disabled={isPending}
+					className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+						isClosed
+							? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+							: 'bg-rose-600 hover:bg-rose-500 text-white'
+					}`}
+				>
+					{isPending ? (
+						<Loader2 className="w-3.5 h-3.5 animate-spin" />
+					) : isClosed ? (
+						<>
+							<Unlock className="w-3.5 h-3.5" /> 경매 재개하기
+						</>
+					) : (
+						<>
+							<Lock className="w-3.5 h-3.5" /> 경매 종료하기
+						</>
+					)}
+				</button>
 
-        {/* 경매 삭제 버튼 */}
-        <button
-          onClick={() => {
-            if (confirm("정말로 이 회차의 경매를 삭제하시겠습니까?")) {
-              startTransition(async () => {
-                try {
-                  await deleteSeatRound(roundNumber, classId);
-                  loadData(); // 삭제 후 데이터 새로고침
-                  alert("경매가 삭제되었습니다.");
-                } catch (err: any) {
-                  alert(`삭제 에러: ${err.message}`);
-                }
-              });
-            }
-          }}
-          disabled={isPending}
-          className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold transition-all"
-        >
-          <Trash2 className="w-3.5 h-3.5" /> 경매 삭제
-        </button>
-      </div>
-    </div>
-  );
+				{/* 미배정 그룹 랜덤 배치 버튼 */}
+				<button
+					onClick={handleRandomAssign}
+					disabled={isPending}
+					className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold transition-all"
+				>
+					<Shuffle className="w-3.5 h-3.5" /> 미배정 그룹 랜덤 배치
+				</button>
+
+				{/* 경매 삭제 버튼 */}
+				<button
+					onClick={() => {
+						if (confirm('정말로 이 회차의 경매를 삭제하시겠습니까?')) {
+							startTransition(async () => {
+								try {
+									await deleteSeatRound(roundNumber, classId);
+									await refreshAuctionState();
+									alert('경매가 삭제되었습니다.');
+								} catch (err: any) {
+									alert(`삭제 에러: ${err.message}`);
+								}
+							});
+						}
+					}}
+					disabled={isPending}
+					className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold transition-all"
+				>
+					<Trash2 className="w-3.5 h-3.5" /> 경매 삭제
+				</button>
+			</div>
+		</div>
+	);
 }

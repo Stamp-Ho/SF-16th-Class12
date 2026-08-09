@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import dynamic from 'next/dynamic';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { getSeatRounds } from './actions';
 import ClassroomGrid from './ClassroomGrid';
-import AdminControlPanel from './AdminControlPanel';
 import { createClient } from '@/utils/supabase/client';
 import {
 	Armchair,
@@ -16,7 +16,14 @@ import {
 	ArrowLeft,
 } from 'lucide-react';
 import Link from 'next/link';
-import AllocationAddModal from './AllocationAddModal';
+
+const AdminControlPanel = dynamic(() => import('./AdminControlPanel'), {
+	ssr: false,
+});
+
+const AllocationAddModal = dynamic(() => import('./AllocationAddModal'), {
+	ssr: false,
+});
 
 export default function SeatsMain({ classId }: { classId: string }) {
 	const supabase = useMemo(() => createClient(), []);
@@ -27,53 +34,12 @@ export default function SeatsMain({ classId }: { classId: string }) {
 
 	// 모달 상태
 	const [isModalOpen, setIsModalOpen] = useState(false);
+	const selectedRoundNumberRef = useRef<number | null>(null);
 
 	// 로그인 사용자 정보
 	const [currentUser, setCurrentUser] = useState({ name: '', isAdmin: false });
-	useEffect(() => {
-		loadData();
-		fetchCurrentUser();
-		// 💡 Supabase Realtime 구독 설정
-		const channel = supabase
-			.channel('realtime-seats')
-			.on(
-				'postgres_changes',
-				{
-					event: 'UPDATE',
-					schema: 'public',
-					table: 'seat_allocations',
-					filter: `class_id=eq.${classId}`,
-				},
-				(payload) => {
-					const updatedSeat = payload.new;
-					const currentCode = myOccupiedCodeRef.current;
-					const currentGroupId = myGroupIdRef.current;
 
-					// 내가 선점 중이던 자리를 다른 팀이 뺏어간 경우 알림
-					if (
-						currentCode &&
-						updatedSeat.seat_code === currentCode &&
-						updatedSeat.current_group_id !== currentGroupId &&
-						updatedSeat.current_group_id !== null &&
-						updatedSeat.round_number === selectedRound?.roundNumber
-					) {
-						alert(
-							`⚠️ [경고] ${updatedSeat.seat_code}구역 자리를 다른 팀이 상향 입찰하여 뺏어갔습니다!`,
-						);
-					}
-
-					loadData();
-				},
-			)
-			.subscribe();
-
-		// 컴포넌트 언마운트 시 구독 해제 (메모리 누수 방지)
-		return () => {
-			supabase.removeChannel(channel);
-		};
-	}, []);
-	// 💡 1. 현재 로그인한 유저 프로필 및 Admin 권한 조회
-	async function fetchCurrentUser() {
+	const fetchCurrentUser = useCallback(async () => {
 		try {
 			const {
 				data: { user },
@@ -98,33 +64,72 @@ export default function SeatsMain({ classId }: { classId: string }) {
 		} catch (err) {
 			console.error('유저 정보 조회 실패:', err);
 		}
-	}
+	}, [supabase]);
 
-	async function loadData() {
+	const loadData = useCallback(async () => {
 		try {
 			const data = await getSeatRounds(classId);
 			setRounds(data);
-			if (
-				data.filter((r) => r.roundNumber === selectedRound?.roundNumber)
-					.length === 0 ||
-				(!selectedRound && data.length > 0)
-			) {
-				setSelectedRound((prevSelected: any) => {
-					// 1. 이미 선택된 회차가 있다면, DB에서 새로 받아온 data 중 같은 회차(roundNumber)를 찾아 최신 상태로 업데이트
-					if (prevSelected) {
-						const matchedRound = data.find(
-							(r) => r.roundNumber === prevSelected.roundNumber,
-						);
-						return matchedRound || data[0]; // 혹시 삭제되었으면 1회차로
-					}
 
-					return data[0];
-				});
-			}
-		} catch (err: any) {
+			setSelectedRound((prevSelected: any) => {
+				if (data.length === 0) return null;
+
+				if (prevSelected) {
+					const matchedRound = data.find(
+						(r) => r.roundNumber === prevSelected.roundNumber,
+					);
+					return matchedRound || data[0];
+				}
+
+				return data[0];
+			});
+		} catch (err) {
 			console.error('데이터 로드 에러:', err);
 		}
-	}
+	}, [classId]);
+
+	useEffect(() => {
+		void loadData();
+		void fetchCurrentUser();
+		// 💡 Supabase Realtime 구독 설정
+		const channel = supabase
+			.channel('realtime-seats')
+			.on(
+				'postgres_changes',
+				{
+					event: 'UPDATE',
+					schema: 'public',
+					table: 'seat_allocations',
+					filter: `class_id=eq.${classId}`,
+				},
+				(payload) => {
+					const updatedSeat = payload.new;
+					const currentCode = myOccupiedCodeRef.current;
+					const currentGroupId = myGroupIdRef.current;
+
+					// 내가 선점 중이던 자리를 다른 팀이 뺏어간 경우 알림
+					if (
+						currentCode &&
+						updatedSeat.seat_code === currentCode &&
+						updatedSeat.current_group_id !== currentGroupId &&
+						updatedSeat.current_group_id !== null &&
+						updatedSeat.round_number === selectedRoundNumberRef.current
+					) {
+						alert(
+							`⚠️ [경고] ${updatedSeat.seat_code}구역 자리를 다른 팀이 상향 입찰하여 뺏어갔습니다!`,
+						);
+					}
+
+					void loadData();
+				},
+			)
+			.subscribe();
+
+		// 컴포넌트 언마운트 시 구독 해제 (메모리 누수 방지)
+		return () => {
+			supabase.removeChannel(channel);
+		};
+	}, [classId, fetchCurrentUser, loadData, supabase]);
 
 	// 신규 배정 모달 열기
 	const handleOpenCreateModal = () => {
@@ -152,6 +157,11 @@ export default function SeatsMain({ classId }: { classId: string }) {
 	);
 	const myOccupiedCode = myOccupiedSeat?.seat_code || null;
 	const myCurrentBidPrice = myOccupiedSeat?.current_bid_price || 0;
+
+	useEffect(() => {
+		selectedRoundNumberRef.current = selectedRound?.roundNumber ?? null;
+	}, [selectedRound]);
+
 	useEffect(() => {
 		myOccupiedCodeRef.current = myOccupiedCode;
 		myGroupIdRef.current = myGroupId;

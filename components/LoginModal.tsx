@@ -1,132 +1,140 @@
-"use client";
+'use client';
 
-import { useState, useTransition, useEffect } from "react";
-import { createClient } from "@/utils/supabase/client";
-import { loginWithName } from "@/app/(auth)/actions";
-import { LogIn, Loader2, Lock, User } from "lucide-react";
+import { useState, useTransition, useEffect } from 'react';
+import { createClient } from '@/utils/supabase/client';
+import { loginWithName } from '@/app/(auth)/actions';
+import { LogIn, Loader2, Lock, User } from 'lucide-react';
 
 export default function LoginModal() {
-  const [isPending, startTransition] = useTransition();
-  const [errorMessage, setErrorMessage] = useState("");
-  const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
+	const [isPending, startTransition] = useTransition();
+	const [errorMessage, setErrorMessage] = useState('');
+	const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
+	const [selectedClassId, setSelectedClassId] = useState('');
 
-  const fetchClasses = async () => {
-    const supabase = createClient();
-    const { data: classes, error } = await supabase
-      .from("classes")
-      .select("id, name")
-      .order("name", { ascending: true });
-    if (error) {
-      throw new Error(`반 목록 조회 실패: ${error.message}`);
-    }
-    return classes || [];
-  };
+	const fetchClasses = async () => {
+		const supabase = createClient();
+		const { data: classes, error } = await supabase
+			.from('classes')
+			.select('id, name')
+			.order('name', { ascending: true });
+		if (error) {
+			throw new Error(`반 목록 조회 실패: ${error.message}`);
+		}
+		return classes || [];
+	};
 
-  useEffect(() => {
-    startTransition(async () => {
-      try {
-        const fetchedClasses = await fetchClasses();
-        setClasses(fetchedClasses);
-      } catch (err: any) {
-        setErrorMessage(`반 목록 조회 실패: ${err.message}`);
-      }
-    });
-  }, []);
+	useEffect(() => {
+		startTransition(async () => {
+			try {
+				const fetchedClasses = await fetchClasses();
+				setClasses(fetchedClasses);
+				const defaultClass = fetchedClasses.find((c) =>
+					c.name.includes('서울 12반'),
+				);
+				if (defaultClass) {
+					setSelectedClassId(defaultClass.id);
+				}
+			} catch (err: any) {
+				setErrorMessage(`반 목록 조회 실패: ${err.message}`);
+			}
+		});
+	}, []);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setErrorMessage("");
+	const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+		e.preventDefault();
+		setErrorMessage('');
 
-    const formData = new FormData(e.currentTarget);
-    startTransition(async () => {
-      const result = await loginWithName(formData);
-      if (result?.error) {
-        setErrorMessage(result.error);
-      }
-    });
-  };
+		const formData = new FormData(e.currentTarget);
+		startTransition(async () => {
+			const result = await loginWithName(formData);
+			if (result?.error) {
+				setErrorMessage(result.error);
+			}
+		});
+	};
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 border border-slate-100 space-y-6">
-        <div className="text-center space-y-2">
-          <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
-            <LogIn className="w-6 h-6" />
-          </div>
-          <h2 className="text-2xl font-bold text-slate-800">
-            SSAFY 504 로그인
-          </h2>
-          <p className="text-sm text-slate-500">
-            서비스 이용을 위해 이름과 비밀번호를 입력하세요.
-          </p>
-        </div>
+	return (
+		<div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+			<div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 border border-slate-100 space-y-6">
+				<div className="text-center space-y-2">
+					<div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
+						<LogIn className="w-6 h-6" />
+					</div>
+					<h2 className="text-2xl font-bold text-slate-800">
+						SSAFY 504 로그인
+					</h2>
+					<p className="text-sm text-slate-500">
+						서비스 이용을 위해 이름과 비밀번호를 입력하세요.
+					</p>
+				</div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* 반 선택 필드 */}
-          <select
-            name="classId"
-            value={classes.find((c) => c.name.includes("서울 12반"))?.id ?? ""}
-            className="w-full text-sm px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-            required
-          >
-            <option value="">반을 선택하세요</option>
-            {classes.map((cls) => (
-              <option key={cls.id} value={cls.id}>
-                {cls.name}
-              </option>
-            ))}
-          </select>
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">
-              이름
-            </label>
-            <div className="relative">
-              <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-              <input
-                type="text"
-                name="name"
-                placeholder="홍길동"
-                className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                required
-              />
-            </div>
-          </div>
+				<form onSubmit={handleSubmit} className="space-y-4">
+					{/* 반 선택 필드 */}
+					<select
+						name="classId"
+						value={selectedClassId}
+						onChange={(e) => setSelectedClassId(e.target.value)}
+						className="w-full text-sm px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+						required
+					>
+						<option value="">반을 선택하세요</option>
+						{classes.map((cls) => (
+							<option key={cls.id} value={cls.id}>
+								{cls.name}
+							</option>
+						))}
+					</select>
+					<div>
+						<label className="block text-xs font-semibold text-slate-600 mb-1">
+							이름
+						</label>
+						<div className="relative">
+							<User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+							<input
+								type="text"
+								name="name"
+								placeholder="홍길동"
+								className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+								required
+							/>
+						</div>
+					</div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">
-              비밀번호
-            </label>
-            <div className="relative">
-              <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-              <input
-                type="password"
-                name="password"
-                placeholder="••••••••"
-                className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                required
-              />
-            </div>
-          </div>
+					<div>
+						<label className="block text-xs font-semibold text-slate-600 mb-1">
+							비밀번호
+						</label>
+						<div className="relative">
+							<Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+							<input
+								type="password"
+								name="password"
+								placeholder="••••••••"
+								className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+								required
+							/>
+						</div>
+					</div>
 
-          {errorMessage && (
-            <p className="text-xs text-rose-500 font-medium text-center bg-rose-50 p-2.5 rounded-lg">
-              {errorMessage}
-            </p>
-          )}
+					{errorMessage && (
+						<p className="text-xs text-rose-500 font-medium text-center bg-rose-50 p-2.5 rounded-lg">
+							{errorMessage}
+						</p>
+					)}
 
-          <button
-            type="submit"
-            disabled={isPending}
-            className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm py-3 rounded-xl transition-colors disabled:opacity-50"
-          >
-            {isPending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              "로그인하기"
-            )}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
+					<button
+						type="submit"
+						disabled={isPending}
+						className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm py-3 rounded-xl transition-colors disabled:opacity-50"
+					>
+						{isPending ? (
+							<Loader2 className="w-4 h-4 animate-spin" />
+						) : (
+							'로그인하기'
+						)}
+					</button>
+				</form>
+			</div>
+		</div>
+	);
 }
