@@ -39,6 +39,9 @@ export default function SeatsMain({ classId }: { classId: string }) {
 	// 로그인 사용자 정보
 	const [currentUser, setCurrentUser] = useState({ name: '', isAdmin: false });
 
+	// 그룹 정렬 기준 (선점 좌석 없으면 상단 노출)
+	const [sortGroupsByOccupied, setSortGroupsByOccupied] = useState(true);
+
 	const fetchCurrentUser = useCallback(async () => {
 		try {
 			const {
@@ -325,11 +328,32 @@ export default function SeatsMain({ classId }: { classId: string }) {
 										<Users className="w-4 h-4 text-indigo-600" />
 										전체 짝 목록 ({groups.length > 0 ? groups.length : 13})
 									</h3>
+									<button
+										onClick={() =>
+											setSortGroupsByOccupied((prev) => !prev)
+										}
+										className="text-[13px] text-slate-500 hover:text-slate-800 transition-colors mr-5"
+									>
+										{sortGroupsByOccupied
+											?  '원래 순서대로 정렬'
+											:'미배정 상단 노출'}
+									</button>
 								</div>
 
 								<div className="space-y-2 max-h-85.5 overflow-y-auto pr-1">
 									{/* 우측 짝 카드 리스트 내부 */}
-									{currentGroups.map((g: any, idx: number) => {
+									{(sortGroupsByOccupied
+										? [...currentGroups].sort((a: any, b: any) => {
+												const aOccupied = selectedRound.seats.some(
+													(s: any) => s.current_group_id === a.groupId,
+												);
+												const bOccupied = selectedRound.seats.some(
+													(s: any) => s.current_group_id === b.groupId,
+												);
+												return aOccupied === bOccupied ? 0 : aOccupied ? 1 : -1;
+										  })
+										: currentGroups
+									).map((g: any, idx: number) => {
 										const occupiedSeat = selectedRound.seats.find(
 											(s: any) => s.current_group_id === g.groupId,
 										);

@@ -216,12 +216,22 @@ export default function ClassroomGrid({
       {/* 스크린 / 문 / 강사님 */}
       <div className="space-y-3">
         <div className="grid grid-cols-12 gap-2 text-center text-xs font-bold">
-          <div className="col-span-2 bg-slate-200 text-slate-700 py-2 rounded-xl border border-slate-300">
-            문
-          </div>
-          <div className="col-span-10 bg-slate-800 text-white py-2 rounded-xl flex items-center justify-center gap-2">
+          <a
+            href="https://copper-zebu-fc0.notion.site/3b9e15c202ad8075828cff5bcdf83bb6"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="col-span-2 bg-slate-200 text-slate-700 py-2 rounded-xl border border-slate-300 block text-center"
+          >
+            문 (식당)
+          </a>
+          <a
+            href="https://edu.ssafy.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="col-span-10 bg-slate-800 text-white py-2 rounded-xl flex items-center justify-center gap-2 block"
+          >
             <Sparkles className="w-4 h-4 text-amber-400" /> 칠판 (스크린)
-          </div>
+          </a>
         </div>
         <div className="flex justify-between">
           <div className="w-48 bg-violet-50 border-2 border-violet-300 text-violet-900 py-2.5 rounded-xl font-bold text-xs text-center">
