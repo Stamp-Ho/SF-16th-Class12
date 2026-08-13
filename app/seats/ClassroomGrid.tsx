@@ -4,9 +4,10 @@ import { useState, useTransition, useEffect } from "react";
 import {
   deleteSeatInfo,
   placeOrMoveSeatBid,
-  swapSeatPositions
+  swapSeatPositions,
+  toggleSeatLock
 } from "./actions";
-import { ArrowLeftRight, Sparkles, Star, Trash } from "lucide-react";
+import { ArrowLeftRight, Lock, LockOpen, Sparkles, Star, Trash } from "lucide-react";
 
 interface SeatData {
   id: string;
@@ -17,15 +18,16 @@ interface SeatData {
   member_right: string | null;
   current_bid_price: number;
   is_closed: boolean;
+  locked: boolean;
 }
 
 const SEAT_MAP = [
-  { num: 1, type: "restricted", name: "시야제한석" },
+  { num: 1, type: "seat", code: "가", pos: "R"},
   { num: 2, type: "seat", code: "A", pos: "L" },
   { num: 3, type: "seat", code: "A", pos: "R" },
   { num: 4, type: "seat", code: "B", pos: "L" },
   { num: 5, type: "seat", code: "B", pos: "R" },
-  { num: 6, type: "restricted", name: "안좋은 자리" },
+  { num: 6, type: "seat", code: "나", pos: "R" },
 
   { num: 7, type: "seat", code: "C", pos: "L" },
   { num: 8, type: "seat", code: "C", pos: "R" },
@@ -48,13 +50,15 @@ const SEAT_MAP = [
   { num: 23, type: "seat", code: "K", pos: "L" },
   { num: 24, type: "seat", code: "K", pos: "R" },
 
-  { num: 25, type: "thinking", name: "생각의자" },
+  { num: 25, type: "seat", code: "다", pos:"R" },
   { num: 26, type: "seat", code: "L", pos: "L" },
   { num: 27, type: "seat", code: "L", pos: "R" },
   { num: 28, type: "seat", code: "M", pos: "L" },
   { num: 29, type: "seat", code: "M", pos: "R" },
   { num: 30, type: "thinking", name: "생각의자" }
 ];
+
+const CORNER_SEATS = ["가", "나", "다"];
 
 const CODE_COLORS: Record<string, string> = {
   A: "bg-rose-50 border-rose-200 text-rose-900 hover:bg-rose-100",
@@ -69,8 +73,11 @@ const CODE_COLORS: Record<string, string> = {
   J: "bg-fuchsia-100 border-fuchsia-300 text-fuchsia-950 hover:bg-fuchsia-200",
   K: "bg-lime-50 border-lime-200 text-lime-900 hover:bg-lime-100",
   L: "bg-sky-50 border-sky-200 text-sky-900 hover:bg-sky-100",
-  M: "bg-green-50 border-green-200 text-green-900 hover:bg-green-100"
-};
+  M: "bg-green-50 border-green-200 text-green-900 hover:bg-green-100",
+  가: "bg-rose-50 border-rose-200 text-rose-900 hover:bg-rose-100",
+  나: "bg-teal-50 border-teal-200 text-teal-900 hover:bg-teal-100",
+  다: "bg-sky-50 border-sky-200 text-sky-900 hover:bg-sky-100",
+ };
 
 const MY_CODE_COLORS: Record<string, string> = {
   A: "bg-rose-500 hover:bg-rose-500 text-white hover:text-white border-rose-600 ring-3 ring-rose-300 shadow-md",
@@ -85,8 +92,11 @@ const MY_CODE_COLORS: Record<string, string> = {
   J: "bg-fuchsia-600 hover:bg-fuchsia-600 text-white hover:text-white border-fuchsia-700 ring-3 ring-fuchsia-300 shadow-md",
   K: "bg-lime-600 hover:bg-lime-600 text-white hover:text-white border-lime-700 ring-3 ring-lime-300 shadow-md",
   L: "bg-sky-600 hover:bg-sky-600 text-white hover:text-white border-sky-700 ring-3 ring-sky-300 shadow-md",
-  M: "bg-green-600 hover:bg-green-600 text-white hover:text-white border-green-700 ring-3 ring-green-300 shadow-md"
-};
+  M: "bg-green-600 hover:bg-green-600 text-white hover:text-white border-green-700 ring-3 ring-green-300 shadow-md",
+  가: "bg-rose-500 hover:bg-rose-500 text-white hover:text-white border-rose-600 ring-3 ring-rose-300 shadow-md",
+  나: "bg-teal-600 hover:bg-teal-600 text-white hover:text-white border-teal-700 ring-3 ring-teal-300 shadow-md",
+  다: "bg-sky-600 hover:bg-sky-600 text-white hover:text-white border-sky-700 ring-3 ring-sky-300 shadow-md",
+  };
 
 export default function ClassroomGrid({
   roundNumber,
@@ -176,6 +186,13 @@ export default function ClassroomGrid({
       alert(`위치 변경 실패: ${err.message}`);
     }
   };
+  const handleLockClick = async (seatId: string, nextState: boolean) => {
+    try {
+      await toggleSeatLock(seatId, nextState);
+    } catch (err: any) {
+      alert(`좌석 잠금/해제 실패: ${err.message}`);
+    }
+  };
 
   // 💡 Drag & Drop Event Handlers
   const handleDragOver = (e: React.DragEvent, code: string) => {
@@ -225,7 +242,7 @@ export default function ClassroomGrid({
             문 (식당)
           </a>
           <a
-            href="https://edu.ssafy.com/"
+            href="https://app.notion.com/p/3a366fe0f687805d9a4bf4cdec5299bf"
             target="_blank"
             rel="noopener noreferrer"
             className="col-span-10 bg-slate-800 text-white py-2 rounded-xl flex items-center justify-center gap-2 block"
@@ -302,7 +319,7 @@ export default function ClassroomGrid({
       isAdmin ||
       (isOccupied &&
         (currentUserName === seatInfo?.member_left ||
-          currentUserName === seatInfo?.member_right));
+          currentUserName === seatInfo?.member_right) && !CORNER_SEATS.includes(tile.code));
 
     // 💡 드래그한 카드가 타일 위에 올라왔을 때 강조 스타일
     const isHovered = dragOverCode === tile.code;
@@ -349,7 +366,7 @@ export default function ClassroomGrid({
           <div className="my-auto text-center mb-0.5">
             {isOccupied ? (
               <p className="font-extrabold text-lg truncate">
-                {personName || "배치 중"}
+                {personName || "빈 자 리"}
               </p>
             ) : (
               <span
@@ -373,7 +390,7 @@ export default function ClassroomGrid({
         </div>
 
         {/* 스위치 (<->) 버튼 */}
-        {canSwap && seatInfo && !isLeft && (
+        {canSwap && seatInfo && !seatInfo.locked && !isLeft && (
           <button
             onMouseEnter={(e) => e.stopPropagation()}
             disabled={isPending}
@@ -381,7 +398,7 @@ export default function ClassroomGrid({
               e.preventDefault();
               handleSwapClick(e, seatInfo.id);
             }}
-            className={`absolute top-7.5 py-1.25 px-2 rounded-md border-2 transition-colors cursor-pointer ${colorClass
+            className={`absolute top-7.5 py-1.25 px-2.25 rounded-md border-2 transition-colors cursor-pointer ${colorClass
               .replace("bg-", "bg-white ")
               .replace("text-", "text-slate-900 ")
               .replace(
@@ -394,6 +411,29 @@ export default function ClassroomGrid({
           </button>
         )}
         {isAdmin && seatInfo && !isLeft && (
+          <>
+          <button
+            onMouseEnter={(e) => e.stopPropagation()}
+            disabled={isPending}
+            className={`absolute top-1 p-1 rounded-full border-2 transition-colors cursor-pointer ${colorClass
+              .replace("bg-", "bg-white ")
+              .replace("text-", "text-slate-900 ")
+              .replace(
+                "ring-3",
+                "ring-2"
+              )} ${tile.num % 6 === 4 ? "-left-9" : "-left-4 "}`}
+            onClick={(e) => {
+              e.preventDefault();
+              handleLockClick(seatInfo.id, !seatInfo.locked);
+            }}
+            title={seatInfo.locked ? "좌석 잠금 해제" : "좌석 잠금"}
+          >
+            {seatInfo.locked ? (
+              <Lock className="w-3 h-3 text-red-500" />
+            ) : (
+              <LockOpen className="w-3 h-3" />
+            )}
+          </button>
           <button
             onMouseEnter={(e) => e.stopPropagation()}
             disabled={isPending}
@@ -419,7 +459,7 @@ export default function ClassroomGrid({
             title="좌석 삭제"
           >
             <Trash className="w-3 h-3" />
-          </button>
+          </button></>
         )}
       </div>
     );

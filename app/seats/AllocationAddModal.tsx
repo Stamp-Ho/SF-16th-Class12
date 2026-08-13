@@ -290,7 +290,7 @@ export default function AllocationAddModal({
       const result = await createNewSeatRound(
         targetRound,
         roundTitle,
-        flatMembers.map((m) => (m.status ? m.name : "빈자리")),
+        flatMembers.map((m) => (m.status ? m.name : "")),
         classId
       );
 

@@ -88,7 +88,10 @@ export async function createNewSeatRound(
     "J",
     "K",
     "L",
-    "M"
+    "M",
+    "가",
+    "나",
+    "다",
   ];
 
   // 💡 initial_groups 컬럼에 생성된 groups JSONB 데이터를 함께 INSERT
@@ -332,6 +335,25 @@ export async function deleteSeatInfo(seatId: string) {
 
   if (error) {
     throw new Error(`좌석 삭제 실패: ${error.message}`);
+  }
+
+  revalidatePath("/seats");
+  return { success: true };
+}
+
+// ==========================================
+// 9. Admin 전용: 특정 좌석 잠금/잠금 해제
+// ==========================================
+export async function toggleSeatLock(seatId: string, lockStatus: boolean) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("seat_allocations")
+    .update({ locked: lockStatus })
+    .eq("id", seatId);
+
+  if (error) {
+    throw new Error(`좌석 잠금/해제 실패: ${error.message}`);
   }
 
   revalidatePath("/seats");

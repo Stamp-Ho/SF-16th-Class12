@@ -301,12 +301,13 @@ export default function SeatsMain({ classId }: { classId: string }) {
 										)}
 									</h3>
 									<p
-										className={`text-xs ${
-											myOccupiedCode ? 'text-amber-100' : 'text-slate-400'
+										className={`text-xs animate-pulse 
+											${
+											myOccupiedCode ? 'text-white' : 'text-slate-400'
 										}`}
 									>
 										{myCurrentBidPrice > 0
-											? '낙찰 예정이므로 다른 구역 입찰이 불가합니다.'
+											? '낙찰 예정입니다. 여전히 입찰 가능합니다. 주의!'
 											: myOccupiedCode
 												? '빈 자리 클릭시 0원으로 자유 이동 가능합니다.'
 												: '빈 자리를 눌러 0원으로 빠르게 선점하세요!'}
@@ -379,7 +380,7 @@ export default function SeatsMain({ classId }: { classId: string }) {
 											>
 												<div>
 													<p className="font-bold text-slate-800">
-														{g.m1} • {g.m2}
+														{!!g.m1 && !!g.m2 ? `${g.m1} • ${g.m2}` : `${g.m1 || ''}${g.m2 || ''}`}
 													</p>
 												</div>
 
