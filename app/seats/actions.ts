@@ -368,7 +368,7 @@ export async function processGamble(seatId: string) {
 
   // 1. 서버에서 직접 21% 확률 계산 (클라이언트 간섭 원천 차단)
   const isWin = Math.random() < 0.21; 
-  const delta = isWin ? 2500 : -500;
+  const delta = isWin ? 3000 : -500;
 
   // 2. DB에서 현재 금액 조회
   const { data: currentSeat, error: fetchError } = await supabase

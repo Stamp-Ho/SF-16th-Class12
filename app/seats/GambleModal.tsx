@@ -15,7 +15,7 @@ export default function GambleModal({ seatId, onClose }: GambleModalProps) {
 
   // 초기 12개 슬롯 세팅
   const defaultItems = Array.from({ length: 12 }, (_, i) =>
-    i % 3 === 0 ? "+2,500" : "-500"
+    i % 3 === 0 ? "+3,000" : "-500"
   );
   const [reelItems, setReelItems] = useState<string[]>(defaultItems);
   const [targetRotation, setTargetRotation] = useState(0);
@@ -42,12 +42,12 @@ export default function GambleModal({ seatId, onClose }: GambleModalProps) {
         if (isCancelled) return;
 
         const finalResult = isWin ? "win" : "loss";
-        const targetSymbol = isWin ? "+2,500" : "-500";
+        const targetSymbol = isWin ? "+3,000" : "-500";
 
         // 2. 당첨 기호를 정면(0번)에 배치
         const totalSlots = 12;
         const items = Array.from({ length: totalSlots }, (_, i) =>
-          i % 3 === 0 ? "+2,500" : "-500"
+          i % 3 === 0 ? "+3,000" : "-500"
         );
         items[0] = targetSymbol;
         setReelItems(items);
@@ -172,7 +172,7 @@ export default function GambleModal({ seatId, onClose }: GambleModalProps) {
             </p>
           ) : (
             <p className="text-md font-extrabold text-rose-500 flex items-center gap-1 animate-in slide-in-from-bottom-2">
-              <Sparkles className="w-4 h-4" /> 고맙습니다! (+2,500)
+              <Sparkles className="w-4 h-4" /> 고맙습니다! (+3,000)
             </p>
           )}
         </div>
