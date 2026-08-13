@@ -20,7 +20,7 @@ export default function GambleModal({ seatId, seatPrice, onClose }: GambleModalP
   useEffect(() => {
     let isMounted = true;
 
-    const isWin = Math.random() < 0.2;
+    const isWin = Math.random() < 0.21; // 21% 확률로 +2500 당첨
     const finalResult = isWin ? "win" : "loss";
     const targetSymbol = isWin ? "+2,500" : "-500";
 
@@ -50,7 +50,7 @@ export default function GambleModal({ seatId, seatPrice, onClose }: GambleModalP
         acceptFate(seatId, isWin ? seatPrice + 2500 : seatPrice - 500);
         onClose();
       }, 1000);
-    }, 5200);
+    }, 3500);
 
     return () => {
       isMounted = false;
