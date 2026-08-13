@@ -327,7 +327,7 @@ export default function SeatsMain({ classId }: { classId: string }) {
 								<div className="flex items-center justify-between border-b border-slate-100 pb-3">
 									<h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
 										<Users className="w-4 h-4 text-indigo-600" />
-										전체 짝 목록 ({groups.length > 0 ? groups.length : 13})
+										전체 짝 목록 ({currentGroups.length > 0 ? currentGroups.length : "?"})
 									</h3>
 									<button
 										onClick={() =>
