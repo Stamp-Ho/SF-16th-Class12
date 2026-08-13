@@ -363,20 +363,38 @@ export async function toggleSeatLock(seatId: string, lockStatus: boolean) {
 // ==========================================
 // 10. Gamble 모달에서 결과에 따라 금액 증감 처리
 // ==========================================
-export async function acceptFate(seatId: string, result: number) {
+export async function processGamble(seatId: string) {
   const supabase = await createClient();
-  
-  const { error } = await supabase
-    .from("seat_allocations")
-    .update({
-      current_bid_price: result
-    })
-    .eq("id", seatId);
 
-  if (error) {
-    throw new Error(`금액 증감 처리 실패: ${error.message}`);
+  // 1. 서버에서 직접 21% 확률 계산 (클라이언트 간섭 원천 차단)
+  const isWin = Math.random() < 0.21; 
+  const delta = isWin ? 2500 : -500;
+
+  // 2. DB에서 현재 금액 조회
+  const { data: currentSeat, error: fetchError } = await supabase
+    .from('seat_allocations')
+    .select('current_bid_price')
+    .eq('id', seatId)
+    .single();
+
+  if (fetchError || !currentSeat) {
+    throw new Error('좌석 정보를 가져오는데 실패했습니다.');
   }
 
-  revalidatePath("/seats");
-  return { success: true };
+  const newPrice = (currentSeat.current_bid_price || 0) + delta;
+
+  // 3. 버튼 누른 즉시 DB 업데이트 (유저가 앱을 꺼도 이미 변경 완료)
+  const { error: updateError } = await supabase
+    .from('seat_allocations')
+    .update({ current_bid_price: newPrice })
+    .eq('id', seatId);
+
+  if (updateError) {
+    throw new Error(`금액 변경 실패: ${updateError.message}`);
+  }
+
+  revalidatePath('/seats');
+
+  // 4. 연출용 결과(당첨 여부)만 클라이언트에 전달
+  return { isWin };
 }

@@ -469,7 +469,6 @@ export default function SeatsMain({ classId }: { classId: string }) {
 				{gambleModalOn && (
 					<GambleModal
 						seatId={myOccupiedSeat?.id || ''}
-						seatPrice={myCurrentBidPrice}
 						onClose={() => setGambleModalOn(false)}
 					/>
 				)}

@@ -1,63 +1,117 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { acceptFate } from './actions';
+import { useState, useEffect, useRef } from 'react';
+import { processGamble } from './actions';
 import { Dices, Sparkles } from 'lucide-react';
 
 interface GambleModalProps {
   seatId: string;
-  seatPrice: number;
   onClose: () => void;
 }
 
-export default function GambleModal({ seatId, seatPrice, onClose }: GambleModalProps) {
+export default function GambleModal({ seatId, onClose }: GambleModalProps) {
   const [isSpinning, setIsSpinning] = useState(true);
   const [result, setResult] = useState<"loss" | "win" | null>(null);
 
+  // 초기 12개 슬롯 세팅
+  const defaultItems = Array.from({ length: 12 }, (_, i) =>
+    i % 3 === 0 ? "+2,500" : "-500"
+  );
+  const [reelItems, setReelItems] = useState<string[]>(defaultItems);
   const [targetRotation, setTargetRotation] = useState(0);
-  const [reelItems, setReelItems] = useState<string[]>([]);
+
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const frame1Ref = useRef<number | null>(null);
+  const frame2Ref = useRef<number | null>(null);
+  const onCloseRef = useRef(onClose);
 
   useEffect(() => {
-    let isMounted = true;
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
-    const isWin = Math.random() < 0.21; // 21% 확률로 +2500 당첨
-    const finalResult = isWin ? "win" : "loss";
-    const targetSymbol = isWin ? "+2,500" : "-500";
+  useEffect(() => {
+    let isCancelled = false;
 
-    const totalSlots = 12;
-    const items = Array.from({ length: totalSlots }, (_, i) =>
-      i % 3 === 0 ? "+2,500" : "-500"
-    );
-    
-    items[0] = targetSymbol;
-    setReelItems(items);
+    const startGamble = async () => {
+      try {
+        // 1. 서버에서 즉시 DB 변경 및 결과 수령
+        const { isWin } = await processGamble(seatId);
 
-    const totalRounds = 5; 
-    const finalAngle = totalRounds * 360;
+        if (isCancelled) return;
 
-    const spinTimer = setTimeout(() => {
-      if (!isMounted) return;
-      setTargetRotation(finalAngle);
-    }, 100);
+        const finalResult = isWin ? "win" : "loss";
+        const targetSymbol = isWin ? "+2,500" : "-500";
 
-    const stopTimer = setTimeout(() => {
-      if (!isMounted) return;
-      setIsSpinning(false);
-      setResult(finalResult);
+        // 2. 당첨 기호를 정면(0번)에 배치
+        const totalSlots = 12;
+        const items = Array.from({ length: totalSlots }, (_, i) =>
+          i % 3 === 0 ? "+2,500" : "-500"
+        );
+        items[0] = targetSymbol;
+        setReelItems(items);
+        setTargetRotation(0);
+        setIsSpinning(true);
+        setResult(null);
 
-      setTimeout(() => {
-        if (!isMounted) return;
-        acceptFate(seatId, isWin ? seatPrice + 2500 : seatPrice - 500);
-        onClose();
-      }, 1000);
-    }, 3500);
+        // 3. 브라우저 랜더링 프레임을 확실히 잡고 3D 회전 시작 (requestAnimationFrame)
+        frame1Ref.current = requestAnimationFrame(() => {
+          frame2Ref.current = requestAnimationFrame(() => {
+            if (isCancelled) return;
+            // 5바퀴 (1800도) 회전
+            setTargetRotation(1800);
+          });
+        });
+
+        // 4. 회전 완료(5초) 후 결과 출력 및 닫기
+        resultTimerRef.current = setTimeout(() => {
+          if (isCancelled) return;
+          setIsSpinning(false);
+          setResult(finalResult);
+
+          closeTimerRef.current = setTimeout(() => {
+            if (isCancelled) return;
+            onCloseRef.current();
+          }, 1000);
+        }, 5100);
+
+      } catch (error) {
+        console.error("Gamble 처리 에러:", error);
+        if (!isCancelled) {
+          onCloseRef.current();
+        }
+      }
+    };
+
+    // Strict Mode 개발 환경에서 첫 번째 mount는 즉시 unmount 되므로,
+    // 서버 액션 호출을 한 틱 지연해 cleanup에서 안전하게 취소한다.
+    startTimerRef.current = setTimeout(() => {
+      if (isCancelled) return;
+      void startGamble();
+    }, 0);
 
     return () => {
-      isMounted = false;
-      clearTimeout(spinTimer);
-      clearTimeout(stopTimer);
+      isCancelled = true;
+
+      if (startTimerRef.current) {
+        clearTimeout(startTimerRef.current);
+      }
+
+      if (resultTimerRef.current) {
+        clearTimeout(resultTimerRef.current);
+      }
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+      }
+      if (frame1Ref.current !== null) {
+        cancelAnimationFrame(frame1Ref.current);
+      }
+      if (frame2Ref.current !== null) {
+        cancelAnimationFrame(frame2Ref.current);
+      }
     };
-  }, [seatId, onClose]);
+  }, [seatId]);
 
   const getThemeColor = () => {
     if (isSpinning) return "text-yellow-400 border-yellow-500/50";
@@ -74,23 +128,19 @@ export default function GambleModal({ seatId, seatPrice, onClose }: GambleModalP
           <h2 className="text-xl font-black text-white">행운 노리기</h2>
         </div>
 
-        {/* 🎰 3D 원통 슬롯 전광판 (높이 h-20 -> h-28로 확대) */}
+        {/* 🎰 3D 원통 슬롯 전광판 */}
         <div
           className={`w-full h-28 bg-slate-950 border-2 rounded-2xl my-2 shadow-inner relative overflow-hidden flex items-center justify-center transition-all duration-300 ${getThemeColor()}`}
         >
-          {/* 입체감 상하 섀도우 */}
           <div className="absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-slate-950 via-slate-950/80 to-transparent z-20 pointer-events-none" />
           <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent z-20 pointer-events-none" />
 
           {/* 🎡 3D 회전 원통 영역 */}
           <div className="h-full w-full relative [perspective:500px] flex items-center justify-center">
             <div
-              className="w-full h-full absolute [transform-style:preserve-3d] will-change-transform"
+              className="w-full h-full absolute [transform-style:preserve-3d] transition-transform duration-[5000ms] ease-[cubic-bezier(0.15,0.85,0.35,0.96)]"
               style={{
                 transform: `rotateX(-${targetRotation}deg)`,
-                transitionProperty: "transform",
-                transitionDuration: isSpinning ? "5000ms" : "0ms",
-                transitionTimingFunction: "cubic-bezier(0.15, 0.85, 0.35, 0.96)",
               }}
             >
               {reelItems.map((symbol, idx) => {
@@ -100,7 +150,6 @@ export default function GambleModal({ seatId, seatPrice, onClose }: GambleModalP
                     key={idx}
                     className="absolute inset-0 flex items-center justify-center text-3xl font-black [backface-visibility:hidden]"
                     style={{
-                      /* 💡 translateZ(48px) -> translateZ(80px) 로 변경하여 위아래 간격을 넓힘 */
                       transform: `rotateX(${angle}deg) translateZ(80px)`,
                     }}
                   >
