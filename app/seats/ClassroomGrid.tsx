@@ -134,7 +134,10 @@ export default function ClassroomGrid({
   const handleSeatClick = (code: string) => {
     // 이미 트랜지션 처리 중이면 중복 요청 차단
     if (isPending) return;
-
+    if(myGroupName.includes(",") && ["가", "나", "다"].includes(code)) {
+      alert("가/나/다 구역은 1인 팀만 입찰 가능합니다.");
+      return;
+    }
     startTransition(async () => {
       const res = await placeOrMoveSeatBid(
         roundNumber,
