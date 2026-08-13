@@ -359,3 +359,24 @@ export async function toggleSeatLock(seatId: string, lockStatus: boolean) {
   revalidatePath("/seats");
   return { success: true };
 }
+
+// ==========================================
+// 10. Gamble 모달에서 결과에 따라 금액 증감 처리
+// ==========================================
+export async function acceptFate(seatId: string, result: number) {
+  const supabase = await createClient();
+  
+  const { error } = await supabase
+    .from("seat_allocations")
+    .update({
+      current_bid_price: result
+    })
+    .eq("id", seatId);
+
+  if (error) {
+    throw new Error(`금액 증감 처리 실패: ${error.message}`);
+  }
+
+  revalidatePath("/seats");
+  return { success: true };
+}

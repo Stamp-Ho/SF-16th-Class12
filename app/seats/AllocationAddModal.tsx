@@ -21,7 +21,6 @@ import { getTargetUsers } from "../shuffle/actions";
 interface AllocationAddModalProps {
   onClose: () => void;
   rounds: any[];
-  setGroups: (groups: any[]) => void;
   loadData: () => Promise<void>;
   classId: string;
 }
@@ -54,7 +53,6 @@ const dateList = [
 export default function AllocationAddModal({
   onClose,
   rounds,
-  setGroups,
   loadData,
   classId
 }: AllocationAddModalProps) {
@@ -294,9 +292,6 @@ export default function AllocationAddModal({
         classId
       );
 
-      if (result?.groups) {
-        setGroups(result.groups);
-      }
       onClose();
       await loadData();
     } catch (err: any) {

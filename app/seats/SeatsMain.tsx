@@ -9,13 +9,13 @@ import {
 	Armchair,
 	PlusCircle,
 	Users,
-	MapPin,
 	Coins,
 	CheckCircle2,
 	Clock,
 	ArrowLeft,
 } from 'lucide-react';
 import Link from 'next/link';
+import GambleModal from './GambleModal';
 
 const AdminControlPanel = dynamic(() => import('./AdminControlPanel'), {
 	ssr: false,
@@ -30,7 +30,8 @@ export default function SeatsMain({ classId }: { classId: string }) {
 
 	const [rounds, setRounds] = useState<any[]>([]);
 	const [selectedRound, setSelectedRound] = useState<any | null>(null);
-	const [groups, setGroups] = useState<any[]>([]); // 💡 생성된 그룹 짝 목록
+
+	const [gambleModalOn, setGambleModalOn] = useState(false);
 
 	// 모달 상태
 	const [isModalOpen, setIsModalOpen] = useState(false);
@@ -248,81 +249,128 @@ export default function SeatsMain({ classId }: { classId: string }) {
 
 						{/* 💡 우측 (1열 차지): 전체 2인 짝 그룹 현황 리스트 */}
 						<div className="space-y-3">
-							{/* 내 소속 짝 카드 */}
-							<div className="bg-linear-to-br from-indigo-500 to-indigo-600 text-white px-5 py-3 rounded-2xl shadow-md flex items-center justify-between">
-								<div className="space-y-1">
-									<span className="text-[10px] font-bold bg-white/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-										MY PAIR
-									</span>
-									<h3 className="text-xl font-black">{myGroupName}</h3>
-									<p className="text-indigo-100 text-xs">
-										본인:{' '}
-										<span className="font-bold underline">
-											{currentUser.name}
+							<div className="grid grid-cols-2 gap-2">
+								{/* 내 소속 짝 카드 */}
+								<div className="bg-linear-to-br from-indigo-300 to-indigo-600 text-white px-5 py-3 rounded-2xl shadow-md flex items-center justify-between">
+									<div className="space-y-1">
+										<span className="text-[10px] font-bold bg-white/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+											MY PAIR
 										</span>
-									</p>
+										<h3 className="text-xl font-black">{myGroupName}</h3>
+										<p className="text-indigo-100 text-xs">
+											본인:{' '}
+											<span className="font-bold underline">
+												{currentUser.name}
+											</span>
+										</p>
+									</div>
 								</div>
-								<div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center">
-									<Users className="w-6 h-6 text-indigo-100" />
+								{/* 내 입찰가 카드 */}
+								<div>
+									<div className="bg-linear-to-br from-amber-300 to-amber-600 text-white px-5 py-3 rounded-2xl shadow-md flex items-center justify-between">
+									<div className="space-y-1">
+										<span className="text-[10px] font-bold bg-white/30 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+											Seat Bid
+										</span>
+										
+										<div className="text-xl font-black flex items-center justify-center mr-1">
+										<Coins className="w-5 h-5 text-white text-xl mr-2" />{myCurrentBidPrice.toLocaleString()} 원
+									</div>
+										<p className="text-white text-xs">
+											진짜 돈 입니다
+										</p>
+									</div>
+								</div>
+									
 								</div>
 							</div>
 
-							{/* 현재 선점 위치 카드 */}
-							<div
-								className={`px-5 py-3 rounded-2xl shadow-md flex items-center justify-between border  ${
-									myOccupiedCode
-										? 'bg-linear-to-br from-amber-500 to-orange-600 text-white border-amber-400'
-										: 'bg-white text-slate-800 border-slate-200'
-								}`}
-							>
-								<div className="space-y-1">
-									<span
-										className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
-											myOccupiedCode
-												? 'bg-white/20 text-white'
-												: 'bg-slate-100 text-slate-500'
-										}`}
-									>
-										CURRENT SEAT
-									</span>
-									<h3 className="text-xl font-black flex items-center gap-2">
-										{myOccupiedCode ? (
-											<>
-												<span>{myOccupiedCode} 구역 선점 중</span>
-												<span className="text-xs font-normal bg-black/20 px-2 py-0.5 rounded-lg flex items-center gap-1">
-													<Coins className="w-3 h-3 text-amber-200" />
-													{myCurrentBidPrice.toLocaleString()}원
-												</span>
-											</>
-										) : (
-											<span className="text-slate-400">
-												선점한 자리가 없습니다
-											</span>
-										)}
-									</h3>
-									<p
-										className={`text-xs animate-pulse 
-											${
-											myOccupiedCode ? 'text-white' : 'text-slate-400'
-										}`}
-									>
-										{myCurrentBidPrice > 0
-											? '낙찰 예정입니다. 여전히 입찰 가능합니다. 주의!'
-											: myOccupiedCode
-												? '빈 자리 클릭시 0원으로 자유 이동 가능합니다.'
-												: '빈 자리를 눌러 0원으로 빠르게 선점하세요!'}
-									</p>
-								</div>
+							<div className="grid grid-cols-2 gap-2">
+								{/* 현재 선점 위치 카드 */}
 								<div
-									className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+									className={`px-5 py-3 rounded-2xl shadow-md flex items-center justify-between border  ${
 										myOccupiedCode
-											? 'bg-white/10'
-											: 'bg-slate-100 text-slate-400'
+											? 'bg-linear-to-br from-teal-200 to-teal-600 text-white border-teal-300'
+											: 'bg-white text-slate-800 border-slate-200'
 									}`}
 								>
-									<MapPin className="w-6 h-6" />
+									<div className="space-y-1">
+										<span
+											className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+												myOccupiedCode
+													? 'bg-white/20 text-white'
+													: 'bg-slate-100 text-slate-500'
+											}`}
+										>
+											CURRENT SEAT
+										</span>
+										<h3 className="text-xl font-black flex items-center gap-2">
+											{myOccupiedCode ? (
+												<>
+													<span>{myOccupiedCode} 구역 선점 중</span>
+												</>
+											) : (
+												<span className="text-slate-400">
+													선점한 자리가 없습니다
+												</span>
+											)}
+										</h3>
+										<p
+											className={`text-xs animate-pulse 
+												${
+												myOccupiedCode ? 'text-white' : 'text-slate-400'
+											}`}
+										>
+											{myCurrentBidPrice > 0
+												? '여전히 입찰 가능. 주의!'
+												: myOccupiedCode
+													? '자유 이동 가능'
+													: '빈 자리 눌러!'}
+										</p>
+									</div>
+								</div>
+								{/* 행운 노려보기 버튼 */}
+								<div
+									className={`px-5 py-3 rounded-2xl shadow-lg flex items-center justify-between border transition-all duration-300 shadow-md relative overflow-hidden ${
+										myOccupiedCode
+											? 'cursor-pointer bg-[linear-gradient(110deg,#E6C685_0%,#F9E9C3_45%,#F9E9C3_55%,#D9A036_100%)] text-slate-950 border-[#FDF2D9] shadow-inner shadow-white/30'
+											: 'cursor-not-allowed bg-white text-slate-800 border-slate-200'
+									}`}
+									onClick={() => {
+										if (myOccupiedCode && myCurrentBidPrice >= 500) {
+											setGambleModalOn(true);
+										}}}
+									
+								>
+									<div className="space-y-1 relative z-10">
+										<span
+											className={`text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+												myOccupiedCode
+													? 'bg-yellow-800/80 text-yellow-300'
+													: 'bg-slate-100 text-slate-500'
+											}`}
+										>
+											LUCKY TRY
+										</span>
+
+										<h3
+											className={`text-xl font-black flex items-center gap-2 
+											 text-slate-800`}
+										>
+											행운 노리기
+										</h3>
+
+										<p
+											className={`text-xs font-bold animate-pulse ${
+												myOccupiedCode ? 'text-yellow-950/80' : 'text-slate-400'
+											}`}
+										>
+											결과는 본인 책임~
+										</p>
+									</div>
 								</div>
 							</div>
+							
 							<div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-3">
 								<div className="flex items-center justify-between border-b border-slate-100 pb-3">
 									<h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
@@ -413,9 +461,16 @@ export default function SeatsMain({ classId }: { classId: string }) {
 					<AllocationAddModal
 						onClose={() => setIsModalOpen(false)}
 						rounds={rounds}
-						setGroups={setGroups}
 						loadData={loadData}
 						classId={classId}
+					/>
+				)}
+
+				{gambleModalOn && (
+					<GambleModal
+						seatId={myOccupiedSeat?.id || ''}
+						seatPrice={myCurrentBidPrice}
+						onClose={() => setGambleModalOn(false)}
 					/>
 				)}
 			</div>
