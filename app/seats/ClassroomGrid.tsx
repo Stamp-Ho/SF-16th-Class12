@@ -316,7 +316,7 @@ export default function ClassroomGrid({
         "bg-indigo-600 text-white ring-4 ring-indigo-300"
       : CODE_COLORS[tile.code] || "bg-slate-50 border-slate-200";
 
-    const personName = isLeft ? seatInfo?.member_left : seatInfo?.member_right;
+    const personName = CORNER_SEATS.includes(tile.code) && (!seatInfo?.member_left || !seatInfo?.member_right) ? seatInfo?.member_left || seatInfo?.member_right : isLeft ? seatInfo?.member_left : seatInfo?.member_right;
 
     const canSwap =
       isAdmin ||
