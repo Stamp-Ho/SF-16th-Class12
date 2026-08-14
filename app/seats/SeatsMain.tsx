@@ -337,7 +337,7 @@ export default function SeatsMain({ classId }: { classId: string }) {
 											: 'cursor-not-allowed bg-white text-slate-800 border-slate-200'
 									}`}
 									onClick={() => {
-										if (myOccupiedCode && myCurrentBidPrice >= 500) {
+										if (myOccupiedCode && myCurrentBidPrice >= 500 && !myOccupiedSeat.locked) {
 											setGambleModalOn(true);
 										}}}
 									
