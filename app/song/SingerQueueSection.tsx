@@ -9,16 +9,21 @@ import {
 import { GripVertical, Trash2 } from "lucide-react";
 import { reorderSongRecords, cancelSongRecord } from "./actions";
 
+type Singer = {
+  id: number;
+  name: string;
+  reason: string;
+  displayOrder: number;
+};
+
 export default function SingerQueueSection({
   singerList,
   setSingerList,
-  user,
   isAdmin,
   fetchSingerList
 }: {
-  singerList: any[];
-  setSingerList: React.Dispatch<React.SetStateAction<any[]>>;
-  user: { name: string; role: string; classId: string };
+  singerList: Singer[];
+  setSingerList: React.Dispatch<React.SetStateAction<Singer[]>>;
   isAdmin: boolean;
   fetchSingerList: () => void;
 }) {
@@ -39,7 +44,7 @@ export default function SingerQueueSection({
     // 2. 변경된 배열 기준 display_order 재할당 (예: 1000, 1001, 1002...)
     const updatedListWithNewOrder = items.map((singer, idx) => ({
       ...singer,
-      display_order: (idx + 1) * 10 // 여유 있게 10단위 간격 재정렬
+  		displayOrder: (idx + 1) * 10,
     }));
 
     // 3. UI 즉시 갱신 (Optimistic Update)
@@ -50,9 +55,8 @@ export default function SingerQueueSection({
       await reorderSongRecords(
         updatedListWithNewOrder.map((s) => ({
           id: s.id,
-          display_order: s.display_order
+          displayOrder: s.displayOrder
         })),
-        user.classId
       );
     } catch (error) {
       console.error("순서 업데이트 실패:", error);
@@ -157,7 +161,7 @@ export default function SingerQueueSection({
                           {isAdmin && (
                             <button
                               onClick={async () => {
-                                await cancelSongRecord(singer.id, user.classId);
+                								await cancelSongRecord(singer.id);
                                 fetchSingerList();
                               }}
                               className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"

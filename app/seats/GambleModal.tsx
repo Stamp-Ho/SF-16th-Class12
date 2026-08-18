@@ -5,11 +5,22 @@ import { processGamble } from './actions';
 import { Dices, Sparkles } from 'lucide-react';
 
 interface GambleModalProps {
-  seatId: string;
+  seatId: number;
+  userName: string;
+  groupId: number;
+  previousBidPrice: number;
   onClose: () => void;
+  onComplete: () => Promise<void>;
 }
 
-export default function GambleModal({ seatId, onClose }: GambleModalProps) {
+export default function GambleModal({
+  seatId,
+  userName,
+  groupId,
+  previousBidPrice,
+  onClose,
+  onComplete,
+}: GambleModalProps) {
   const [isSpinning, setIsSpinning] = useState(true);
   const [result, setResult] = useState<"loss" | "win" | null>(null);
 
@@ -37,16 +48,17 @@ export default function GambleModal({ seatId, onClose }: GambleModalProps) {
     const startGamble = async () => {
       try {
         // 1. 서버에서 즉시 DB 변경 및 결과 수령
-        const { isWin } = await processGamble(seatId);
+        const allocation = await processGamble(seatId, userName, groupId);
 
         if (isCancelled) return;
 
-        const finalResult = isWin ? "win" : "loss";
-        const targetSymbol = isWin ? "+3,000" : "-500";
+        const priceChange = allocation.bidPrice - previousBidPrice;
+        const finalResult = priceChange > 0 ? "win" : "loss";
+        const targetSymbol = priceChange >= 0 ? `+${priceChange.toLocaleString()}` : priceChange.toLocaleString();
 
         // 2. 당첨 기호를 정면(0번)에 배치
         const totalSlots = 12;
-        const items = Array.from({ length: totalSlots }, (_, i) =>
+        const items: string[] = Array.from({ length: totalSlots }, (_, i) =>
           i % 3 === 0 ? "+3,000" : "-500"
         );
         items[0] = targetSymbol;
@@ -72,6 +84,7 @@ export default function GambleModal({ seatId, onClose }: GambleModalProps) {
 
           closeTimerRef.current = setTimeout(() => {
             if (isCancelled) return;
+            void onComplete();
             onCloseRef.current();
           }, 1000);
         }, 5100);
@@ -111,7 +124,7 @@ export default function GambleModal({ seatId, onClose }: GambleModalProps) {
         cancelAnimationFrame(frame2Ref.current);
       }
     };
-  }, [seatId]);
+  }, [groupId, onComplete, previousBidPrice, seatId, userName]);
 
   const getThemeColor = () => {
     if (isSpinning) return "text-yellow-400 border-yellow-500/50";

@@ -1,39 +1,15 @@
-import { createClient } from "@/utils/supabase/server";
-import { redirect } from "next/navigation";
-import AdminView from "./AdminView"; // 어드민 화면 컴포넌트
+"use client";
 
-export default async function AdminPage({
-  searchParams
-}: {
-  searchParams: Promise<{ unauthorized?: string }>;
-}) {
-  const supabase = await createClient();
+import { useAuth } from "@/components/AuthProvider";
+import AdminView from "./AdminView";
 
-  // 1. 로그인 확인
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-  if (!user) {
-    redirect("/");
+export default function AdminPage() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) return <main className="p-8 text-center text-slate-500">세션 확인 중...</main>;
+  if (!user || (user.role !== "super_admin" && user.role !== "class_admin")) {
+    return <main className="p-8 text-center text-rose-600">관리자 권한이 필요합니다.</main>;
   }
 
-  // 2. Admin 권한 확인
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, class_id")
-    .eq("id", user.id)
-    .single();
-
-  // Admin이 아니면 메인으로 튕겨내기 (unauthorized 쿼리 파라미터 전달)
-  if (profile?.role !== "super_admin" && profile?.role !== "class_admin") {
-    redirect("/?unauthorized=true");
-  }
-
-  return (
-    <AdminView
-      role={profile?.role}
-      myId={user.id}
-      classId={profile?.class_id}
-    />
-  );
+  return <AdminView myUsername={user.username} />;
 }

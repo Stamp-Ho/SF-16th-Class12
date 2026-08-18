@@ -1,7 +1,8 @@
+'use client';
+
 import Link from 'next/link';
-import { createClient } from '@/utils/supabase/server';
+import { useEffect, useState } from 'react';
 import LoginModal from '@/components/LoginModal';
-import { logout } from '@/app/(auth)/actions';
 import {
 	Armchair,
 	Dices,
@@ -13,42 +14,68 @@ import {
 } from 'lucide-react';
 import ChangePwButton from '@/components/ChangePwButton';
 import DeleteLinkButton from '@/components/DeleteLinkButton';
+import { apiRequest } from '@/utils/api/client';
+import { useAuth } from '@/components/AuthProvider';
 
-export default async function MainPage() {
-	const supabase = await createClient();
+type DashboardLink = {
+	id: number;
+	title: string;
+	url: string;
+	description: string | null;
+	displayOrder: number;
+};
 
-	// 1. 현재 세션 유저 조회
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
+export default function MainPage() {
+	const { user, isLoading, logout } = useAuth();
+	const [links, setLinks] = useState<DashboardLink[]>([]);
+	const [linksError, setLinksError] = useState('');
 
-	// 로그인하지 않은 경우 바로 로그인 모달 출력
+	async function loadLinks() {
+		try {
+			setLinks(await apiRequest<DashboardLink[]>('/api/links'));
+			setLinksError('');
+		} catch (error) {
+			setLinksError(
+				error instanceof Error ? error.message : '링크를 불러오지 못했습니다.',
+			);
+		}
+	}
+
+	useEffect(() => {
+		if (!user) return;
+
+		let isActive = true;
+		apiRequest<DashboardLink[]>('/api/links')
+			.then((data) => {
+				if (isActive) {
+					setLinks(data);
+					setLinksError('');
+				}
+			})
+			.catch((error: unknown) => {
+				if (isActive) {
+					setLinksError(
+						error instanceof Error
+							? error.message
+							: '링크를 불러오지 못했습니다.',
+					);
+				}
+			});
+
+		return () => {
+			isActive = false;
+		};
+	}, [user]);
+
+	if (isLoading) {
+		return <main className="p-8 text-center text-slate-500">세션 확인 중...</main>;
+	}
+
 	if (!user) {
 		return <LoginModal />;
 	}
 
-	// 2. 로그인 유저의 profile (Role) 조회
-	const { data: profile } = await supabase
-		.from('profiles')
-		.select('id, name, role, class_id')
-		.eq('id', user.id)
-		.single();
-
-	if (!profile?.class_id) {
-		return <div className="text-center text-red-500">권한이 없습니다.</div>;
-	}
-
-	const [{ data: classInfo }, { data: links }] = await Promise.all([
-		supabase.from('classes').select('name').eq('id', profile.class_id).single(),
-		supabase
-			.from('dashboard_links')
-			.select('id, title, url, description, display_order')
-			.eq('class_id', profile.class_id)
-			.order('display_order', { ascending: true }),
-	]);
-
-	const isAdmin =
-		profile?.role === 'super_admin' || profile?.role === 'class_admin';
+	const isAdmin = user.role === 'super_admin';
 
 	return (
 		<main className="min-h-screen bg-slate-50 p-6 md:p-12">
@@ -57,12 +84,12 @@ export default async function MainPage() {
 				<header className="flex justify-between items-center bg-white p-6 pb-5 rounded-2xl shadow-sm border border-slate-100">
 					<div>
 						<h1 className="text-2xl font-bold text-slate-800">
-							[SSAFY 16기] {classInfo?.name} 대시보드
+							[SSAFY 16기] 대시보드
 						</h1>
 						<p className="text-sm text-slate-500 mt-2">
 							반갑습니다,{' '}
 							<span className="font-semibold text-slate-800">
-								{profile?.name}
+								{user.username}
 							</span>
 							님!
 							{isAdmin && (
@@ -85,16 +112,15 @@ export default async function MainPage() {
 								관리자 센터
 							</Link>
 						)}
-						<ChangePwButton />
-						<form action={logout}>
-							<button
-								type="submit"
-								className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors"
-								title="로그아웃"
-							>
-								<LogOut className="w-5 h-5" />
-							</button>
-						</form>
+						<ChangePwButton username={user.username} />
+						<button
+							type="button"
+							onClick={() => void logout()}
+							className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors"
+							title="로그아웃"
+						>
+							<LogOut className="w-5 h-5" />
+						</button>
 					</div>
 				</header>
 
@@ -131,7 +157,7 @@ export default async function MainPage() {
 								</span>
 								<h2 className="text-2xl font-bold mt-3">노래 큐</h2>
 								<p className="text-teal-100 text-sm mt-1">
-									{classInfo?.name}의 노래방
+									우리 반의 노래방
 								</p>
 							</div>
 							<MicVocal className="w-10 h-10 text-indigo-100 group-hover:scale-110 transition-transform" />
@@ -186,8 +212,8 @@ export default async function MainPage() {
 											<p className="text-xs text-slate-500 mt-2">
 												{item.description}
 											</p>
-											{profile?.role?.includes('super_admin') && (
-												<DeleteLinkButton linkId={item.id} />
+											{isAdmin && (
+												<DeleteLinkButton linkId={item.id} onDeleted={loadLinks} />
 											)}
 										</div>
 									)}
@@ -197,6 +223,9 @@ export default async function MainPage() {
 							<div className="col-span-full bg-white p-8 rounded-2xl border border-dashed border-slate-200 text-center text-slate-400 text-sm">
 								등록된 공지가 없습니다.
 							</div>
+						)}
+						{linksError && (
+							<p className="col-span-full text-sm text-rose-600">{linksError}</p>
 						)}
 					</div>
 				</section>

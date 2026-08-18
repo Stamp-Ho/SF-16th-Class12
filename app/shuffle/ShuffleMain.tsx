@@ -22,7 +22,16 @@ interface UserItem {
   id: string;
   name: string;
 }
-export default function ShuffleMain({ classId }: { classId: string }) {
+
+interface DrawHistoryItem {
+  id: number;
+  title: string;
+  description: string | null;
+  result_data: { order: number; name: string }[];
+  created_at: string;
+  creator: null;
+}
+export default function ShuffleMain() {
   const [users, setUsers] = useState<UserItem[]>([]);
   const [shuffledList, setShuffledList] = useState<
     { order: number; name: string }[]
@@ -38,24 +47,24 @@ export default function ShuffleMain({ classId }: { classId: string }) {
 
   // 히스토리 모달 상태
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<DrawHistoryItem[]>([]);
 
   // 1. 초기 유저 데이터 로드
   useEffect(() => {
     async function load() {
       try {
-        const data = await getTargetUsers(classId || "");
+        const data = await getTargetUsers();
         setUsers(data);
         // 초기 고정 순서 설정
         setShuffledList(
           data.map((u, idx) => ({ order: idx + 1, name: u.name }))
         );
-      } catch (err: any) {
-        console.error(err);
+      } catch (error) {
+        console.error(error);
       }
     }
     load();
-  }, [classId]);
+  }, []);
 
   // 2. 셔플(Fisher-Yates) 함수 및 애니메이션 효과
   const handleShuffle = () => {
@@ -94,23 +103,35 @@ export default function ShuffleMain({ classId }: { classId: string }) {
 
     startTransition(async () => {
       try {
-        await saveRandomDraw(title, description, shuffledList, classId);
+        const draw = await saveRandomDraw(title, description, shuffledList);
+        setShuffledList(
+          draw.results.map((result) => ({
+            order: result.drawOrder,
+            name: result.userName,
+          })),
+        );
         setSaveMessage("추첨 결과가 성공적으로 저장되었습니다!");
         setTitle("");
         setDescription("");
-      } catch (err: any) {
-        setSaveMessage(`저장 에러: ${err.message}`);
+      } catch (error) {
+        setSaveMessage(
+          `저장 에러: ${error instanceof Error ? error.message : "알 수 없는 오류"}`,
+        );
       }
     });
   };
   // 4. 히스토리 모달 열기
   const handleOpenHistory = async () => {
     try {
-      const data = await getRandomDrawHistory(classId || "");
+      const data = await getRandomDrawHistory();
       setHistory(data);
       setIsHistoryOpen(true);
-    } catch (err: any) {
-      alert(`히스토리 로드 실패: ${err.message}`);
+    } catch (error) {
+      alert(
+        `히스토리 로드 실패: ${
+          error instanceof Error ? error.message : "알 수 없는 오류"
+        }`,
+      );
     }
   };
   return (

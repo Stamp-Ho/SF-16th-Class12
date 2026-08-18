@@ -1,8 +1,14 @@
 'use client';
 import { KeyRound, X, Loader2 } from 'lucide-react';
 import { useState } from 'react';
-import { createClient } from '@/utils/supabase/client';
-export default function ChangePwModal({ onClose }: { onClose: () => void }) {
+import { apiRequest, type UserInfo } from '@/utils/api/client';
+export default function ChangePwModal({
+	username,
+	onClose,
+}: {
+	username: string;
+	onClose: () => void;
+}) {
 	// 비밀번호 변경 모달 상태
 	const [newPassword, setNewPassword] = useState('');
 	const [confirmPassword, setConfirmPassword] = useState('');
@@ -24,19 +30,24 @@ export default function ChangePwModal({ onClose }: { onClose: () => void }) {
 
 		setIsChanging(true);
 		try {
-			const supabase = createClient();
-			const { error } = await supabase.auth.updateUser({
-				password: newPassword,
-			});
-
-			if (error) throw error;
+			await apiRequest<UserInfo>(
+				`/api/users/change_password/${encodeURIComponent(username)}`,
+				{
+					method: 'PATCH',
+					body: JSON.stringify({ newPassword }),
+				},
+			);
 
 			alert('비밀번호가 성공적으로 변경되었습니다!');
 			onClose(); // 모달 닫기
 			setNewPassword('');
 			setConfirmPassword('');
-		} catch (err: any) {
-			alert(`비밀번호 변경 실패: ${err.message}`);
+		} catch (error) {
+			alert(
+				`비밀번호 변경 실패: ${
+					error instanceof Error ? error.message : '알 수 없는 오류'
+				}`,
+			);
 		} finally {
 			setIsChanging(false);
 		}

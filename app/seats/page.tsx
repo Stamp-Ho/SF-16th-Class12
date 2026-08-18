@@ -1,26 +1,18 @@
-import { createClient } from "@/utils/supabase/server";
+"use client";
+
 import LoginModal from "@/components/LoginModal";
+import { useAuth } from "@/components/AuthProvider";
 
 import SeatsMain from "./SeatsMain";
 
-export default async function SeatAuctionPage() {
-  const supabase = await createClient();
+export default function SeatAuctionPage() {
+  const { user, isLoading } = useAuth();
 
-  // 1. 현재 세션 유저 조회
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return <LoginModal />;
+  if (isLoading) {
+    return <main className="p-8 text-center text-slate-500">세션 확인 중...</main>;
   }
-  // 2. 로그인 유저의 profile (Role) 조회
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
-  if (!profile || !profile.class_id) {
-    return <div className="text-center text-red-500">권한이 없습니다.</div>;
-  }
-  return <SeatsMain classId={profile.class_id} />;
+
+  if (!user) return <LoginModal />;
+
+  return <SeatsMain />;
 }

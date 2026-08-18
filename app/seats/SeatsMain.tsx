@@ -1,10 +1,10 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { getSeatRounds } from './actions';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { getSeatRounds, type SeatRound } from './actions';
 import ClassroomGrid from './ClassroomGrid';
-import { createClient } from '@/utils/supabase/client';
+import { useAuth } from '@/components/AuthProvider';
 import {
 	Armchair,
 	PlusCircle,
@@ -25,11 +25,10 @@ const AllocationAddModal = dynamic(() => import('./AllocationAddModal'), {
 	ssr: false,
 });
 
-export default function SeatsMain({ classId }: { classId: string }) {
-	const supabase = useMemo(() => createClient(), []);
-
-	const [rounds, setRounds] = useState<any[]>([]);
-	const [selectedRound, setSelectedRound] = useState<any | null>(null);
+export default function SeatsMain() {
+	const { user } = useAuth();
+	const [rounds, setRounds] = useState<SeatRound[]>([]);
+	const [selectedRound, setSelectedRound] = useState<SeatRound | null>(null);
 
 	const [gambleModalOn, setGambleModalOn] = useState(false);
 
@@ -37,42 +36,17 @@ export default function SeatsMain({ classId }: { classId: string }) {
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const selectedRoundNumberRef = useRef<number | null>(null);
 
-	// 로그인 사용자 정보
-	const [currentUser, setCurrentUser] = useState({ name: '', isAdmin: false });
+	const currentUser = {
+		name: user?.username ?? '',
+		isAdmin: user?.role === 'super_admin' || user?.role === 'class_admin',
+	};
 
 	// 그룹 정렬 기준 (선점 좌석 없으면 상단 노출)
 	const [sortGroupsByOccupied, setSortGroupsByOccupied] = useState(true);
 
-	const fetchCurrentUser = useCallback(async () => {
-		try {
-			const {
-				data: { user },
-			} = await supabase.auth.getUser();
-
-			if (!user) return;
-
-			// profiles 테이블에서 name과 role 조회
-			const { data: profile } = await supabase
-				.from('profiles')
-				.select('name, role')
-				.eq('id', user.id)
-				.single();
-
-			if (profile) {
-				setCurrentUser({
-					name: profile.name,
-					isAdmin:
-						profile.role === 'super_admin' || profile.role === 'class_admin',
-				});
-			}
-		} catch (err) {
-			console.error('유저 정보 조회 실패:', err);
-		}
-	}, [supabase]);
-
 	const loadData = useCallback(async () => {
 		try {
-			const data = await getSeatRounds(classId);
+			const data = await getSeatRounds();
 			setRounds(data);
 
 			setSelectedRound((prevSelected: any) => {
@@ -90,50 +64,11 @@ export default function SeatsMain({ classId }: { classId: string }) {
 		} catch (err) {
 			console.error('데이터 로드 에러:', err);
 		}
-	}, [classId]);
+	}, []);
 
 	useEffect(() => {
 		void loadData();
-		void fetchCurrentUser();
-		// 💡 Supabase Realtime 구독 설정
-		const channel = supabase
-			.channel('realtime-seats')
-			.on(
-				'postgres_changes',
-				{
-					event: 'UPDATE',
-					schema: 'public',
-					table: 'seat_allocations',
-					filter: `class_id=eq.${classId}`,
-				},
-				(payload) => {
-					const updatedSeat = payload.new;
-					const currentCode = myOccupiedCodeRef.current;
-					const currentGroupId = myGroupIdRef.current;
-
-					// 내가 선점 중이던 자리를 다른 팀이 뺏어간 경우 알림
-					if (
-						currentCode &&
-						updatedSeat.seat_code === currentCode &&
-						updatedSeat.current_group_id !== currentGroupId &&
-						updatedSeat.current_group_id !== null &&
-						updatedSeat.round_number === selectedRoundNumberRef.current
-					) {
-						alert(
-							`⚠️ [경고] ${updatedSeat.seat_code}구역 자리를 다른 팀이 상향 입찰하여 뺏어갔습니다!`,
-						);
-					}
-
-					void loadData();
-				},
-			)
-			.subscribe();
-
-		// 컴포넌트 언마운트 시 구독 해제 (메모리 누수 방지)
-		return () => {
-			supabase.removeChannel(channel);
-		};
-	}, [classId, fetchCurrentUser, loadData, supabase]);
+	}, [loadData]);
 
 	// 신규 배정 모달 열기
 	const handleOpenCreateModal = () => {
@@ -141,7 +76,7 @@ export default function SeatsMain({ classId }: { classId: string }) {
 	};
 
 	const myOccupiedCodeRef = useRef<string | null>(null);
-	const myGroupIdRef = useRef<string>('');
+	const myGroupIdRef = useRef<number | null>(null);
 
 	// 1. 현재 회차의 영구 저장된 전체 짝 목록 (initial_groups)
 	const currentGroups = selectedRound?.groups || [];
@@ -152,12 +87,12 @@ export default function SeatsMain({ classId }: { classId: string }) {
 	);
 
 	// 내 그룹 ID 및 그룹명 (예: groupId: "GROUP_1", groupName: "정인호, 김철수")
-	const myGroupId = myMatchedGroup?.groupId || '';
+	const myGroupId = myMatchedGroup?.groupId ?? null;
 	const myGroupName = myMatchedGroup?.groupName || currentUser.name;
 
 	// 3. 내가 속한 그룹이 현재 선점하고 있는 구역(A~M) 및 입찰가 정보 검색
 	const myOccupiedSeat = selectedRound?.seats?.find(
-		(s: any) => s.current_group_id === myGroupId && myGroupId !== '',
+		(s: any) => s.current_group_id === myGroupId && myGroupId !== null,
 	);
 	const myOccupiedCode = myOccupiedSeat?.seat_code || null;
 	const myCurrentBidPrice = myOccupiedSeat?.current_bid_price || 0;
@@ -223,10 +158,9 @@ export default function SeatsMain({ classId }: { classId: string }) {
 				{/* 4. 어드민 제어 패널 */}
 				{currentUser.isAdmin && selectedRound && (
 					<AdminControlPanel
-						roundNumber={selectedRound.roundNumber}
+						roundId={selectedRound.id}
 						isClosed={selectedRound.isClosed}
 						loadData={loadData}
-						classId={classId}
 					/>
 				)}
 
@@ -236,14 +170,12 @@ export default function SeatsMain({ classId }: { classId: string }) {
 						{/* 좌측 (2열 차지): 배치도 */}
 						<div className="lg:col-span-2">
 							<ClassroomGrid
-								roundNumber={selectedRound.roundNumber}
 								seatList={selectedRound.seats}
 								myGroupId={myGroupId}
 								myGroupName={myGroupName}
 								currentUserName={currentUser.name}
 								isAdmin={currentUser.isAdmin}
 								loadData={loadData}
-								classId={classId}
 							/>
 						</div>
 
@@ -337,7 +269,7 @@ export default function SeatsMain({ classId }: { classId: string }) {
 											: 'cursor-not-allowed bg-white text-slate-800 border-slate-200'
 									}`}
 									onClick={() => {
-										if (myOccupiedCode && myCurrentBidPrice >= 500 && !myOccupiedSeat.locked) {
+										if (myOccupiedCode && myCurrentBidPrice >= 500 && !myOccupiedSeat?.locked) {
 											setGambleModalOn(true);
 										}}}
 									
@@ -462,13 +394,16 @@ export default function SeatsMain({ classId }: { classId: string }) {
 						onClose={() => setIsModalOpen(false)}
 						rounds={rounds}
 						loadData={loadData}
-						classId={classId}
 					/>
 				)}
 
 				{gambleModalOn && (
 					<GambleModal
-						seatId={myOccupiedSeat?.id || ''}
+						seatId={myOccupiedSeat?.id ?? 0}
+						userName={currentUser.name}
+						groupId={myGroupId ?? 0}
+						previousBidPrice={myCurrentBidPrice}
+						onComplete={loadData}
 						onClose={() => setGambleModalOn(false)}
 					/>
 				)}

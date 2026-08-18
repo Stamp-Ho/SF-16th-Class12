@@ -1,19 +1,30 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { searchSongAtYouTube, startTopSongRecord } from "./actions";
+import { startTopSongRecord } from "./actions";
+import type { SongRecord } from "./actions";
+import { searchSongAtYouTube } from "./youtube-actions";
 import YouTube from "react-youtube";
+
+type SearchResult = {
+  id: string;
+  title: string;
+  youtubeUrl: string;
+  thumbnailUrl: string | undefined;
+};
 
 export default function SearchModal({
   targetRecordId, // 업데이트할 현재 1순위 DB 레코드 ID (UUID)
+  onSongStarted,
   onClose
 }: {
-  targetRecordId: string;
+  targetRecordId: number;
+  onSongStarted: (song: SongRecord) => void;
   onClose: () => void;
 }) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [selectedSong, setSelectedSong] = useState<any | null>(null);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [selectedSong, setSelectedSong] = useState<SearchResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,8 +37,7 @@ export default function SearchModal({
       const results = await searchSongAtYouTube(searchQuery);
       setSearchResults(results);
       setSelectedSong(null); // 새로운 검색 시 기존 선택 초기화
-    } catch (err) {
-      console.error(err);
+    } catch {
       setError("검색 중 오류가 발생했습니다.");
     } finally {
       setIsLoading(false);
@@ -37,17 +47,14 @@ export default function SearchModal({
   const handleConfirm = async () => {
     if (!selectedSong || !targetRecordId) return;
     try {
-      const { error } = await startTopSongRecord({
+      const song = await startTopSongRecord({
         id: targetRecordId,
         songName: selectedSong.title,
-        youtubeVideoId: selectedSong.id,
         youtubeUrl: selectedSong.youtubeUrl
       });
-      if (error) {
-        throw new Error("노래 기록 업데이트 실패");
-      }
+			onSongStarted(song);
       onClose();
-    } catch (err) {
+    } catch {
       setError("노래 시작 처리 중 오류가 발생했습니다.");
     }
   };

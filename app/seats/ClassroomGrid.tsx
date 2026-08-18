@@ -1,23 +1,22 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition } from "react";
 import {
-  deleteSeatInfo,
   placeOrMoveSeatBid,
   swapSeatPositions,
   toggleSeatLock
 } from "./actions";
-import { ArrowLeftRight, Lock, LockOpen, Sparkles, Star, Trash } from "lucide-react";
+import { ArrowLeftRight, Lock, LockOpen, Sparkles, Star } from "lucide-react";
 
 interface SeatData {
-  id: string;
+  id: number;
   seat_code: string;
-  current_group_id: string | null;
+  current_group_id: number | null;
   current_group_name: string | null;
   member_left: string | null;
+  member_middle: string | null;
   member_right: string | null;
   current_bid_price: number;
-  is_closed: boolean;
   locked: boolean;
 }
 
@@ -99,34 +98,24 @@ const MY_CODE_COLORS: Record<string, string> = {
   };
 
 export default function ClassroomGrid({
-  roundNumber,
   seatList,
   myGroupId,
   myGroupName,
   currentUserName,
   isAdmin,
-  classId,
   loadData
 }: {
-  roundNumber: number;
   seatList: SeatData[];
-  myGroupId: string;
+  myGroupId: number | null;
   myGroupName: string;
   currentUserName: string;
   isAdmin: boolean;
-  classId: string;
-  loadData: () => void;
+  loadData: () => Promise<void>;
 }) {
   const [isPending, startTransition] = useTransition();
   // 💡 드래그 중인 타일의 시각적 피드백 상태 (드롭 호버 중인 구역 코드)
   const [dragOverCode, setDragOverCode] = useState<string | null>(null);
-  const [tatalCost, setTotalCost] = useState<number>(0);
-
-  useEffect(() => {
-    let result = 0;
-    seatList.forEach((s) => (result += s.current_bid_price));
-    setTotalCost(result);
-  }, [seatList]);
+  const totalCost = seatList.reduce((total, seat) => total + seat.current_bid_price, 0);
   const getSeatInfo = (code: string) =>
     seatList.find((s) => s.seat_code === code);
 
@@ -134,62 +123,43 @@ export default function ClassroomGrid({
   const handleSeatClick = (code: string) => {
     // 이미 트랜지션 처리 중이면 중복 요청 차단
     if (isPending) return;
-    if(myGroupName.includes(",") && ["가", "나", "다"].includes(code)) {
+    if (!myGroupId) return;
+    if (["가", "나", "다"].includes(code) && myGroupName.includes(",")) {
       alert("가/나/다 구역은 1인 팀만 입찰 가능합니다.");
       return;
     }
     startTransition(async () => {
-      const res = await placeOrMoveSeatBid(
-        roundNumber,
-        code,
-        myGroupId,
-        myGroupName,
-        classId
-      );
-
-      if (!res.success) {
-        alert(res.error);
-        loadData();
-        return;
-      }
-
-      if (res.message) {
-        alert(res.message);
-      }
-
-      // 필요한 데이터 갱신
-      loadData();
+      const seat = getSeatInfo(code);
+      if (!seat) return;
+      await placeOrMoveSeatBid(seat.id, currentUserName, myGroupId);
+      await loadData();
     });
   };
 
   // 💡 드래그 앤 드롭 전용 입찰/배정 처리 함수
   const handleSeatDropBid = async (
     code: string,
-    targetGroupId: string,
-    targetGroupName: string
+    targetGroupId: number,
   ) => {
     try {
-      await placeOrMoveSeatBid(
-        roundNumber,
-        code,
-        targetGroupId,
-        targetGroupName,
-        classId
-      );
-    } catch (err: any) {
-      alert(`드롭 배정 실패: ${err.message}`);
+      const seat = getSeatInfo(code);
+      if (!seat) return;
+      await placeOrMoveSeatBid(seat.id, currentUserName, targetGroupId);
+      await loadData();
+    } catch (error) {
+      alert(`드롭 배정 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`);
     }
   };
 
-  const handleSwapClick = async (e: React.MouseEvent, seatId: string) => {
+  const handleSwapClick = async (e: React.MouseEvent, seat: SeatData) => {
     e.stopPropagation();
     try {
-      await swapSeatPositions(seatId);
+      await swapSeatPositions(seat);
     } catch (err: any) {
       alert(`위치 변경 실패: ${err.message}`);
     }
   };
-  const handleLockClick = async (seatId: string, nextState: boolean) => {
+  const handleLockClick = async (seatId: number, nextState: boolean) => {
     try {
       await toggleSeatLock(seatId, nextState);
     } catch (err: any) {
@@ -218,14 +188,13 @@ export default function ClassroomGrid({
     setDragOverCode(null);
 
     // 드래그 아이템에서 전달된 그룹 정보 추출
-    const targetGroupId = e.dataTransfer.getData("text/plain");
-    const targetGroupName = e.dataTransfer.getData("groupName");
+    const targetGroupId = Number(e.dataTransfer.getData("text/plain"));
 
-    if (!targetGroupId || !targetGroupName) return;
+    if (!targetGroupId) return;
 
     // 본인 그룹이거나 관리자인 경우 드롭 진행
     if (isAdmin || targetGroupId === myGroupId) {
-      await handleSeatDropBid(code, targetGroupId, targetGroupName);
+      await handleSeatDropBid(code, targetGroupId);
     } else {
       alert("본인의 팀 카드만 드래그하여 배치할 수 있습니다.");
     }
@@ -255,7 +224,7 @@ export default function ClassroomGrid({
         </div>
         <div className="flex justify-between">
           <div className="w-48 bg-violet-50 border-2 border-violet-300 text-violet-900 py-2.5 rounded-xl font-bold text-xs text-center">
-            총액: {(tatalCost * 2).toLocaleString()}원
+            총액: {(totalCost * 2).toLocaleString()}원
           </div>
           <div className="w-48 bg-amber-50 border-2 border-amber-300 text-amber-900 py-2.5 rounded-xl font-bold text-xs text-center">
             강사님 자~리
@@ -399,7 +368,7 @@ export default function ClassroomGrid({
             disabled={isPending}
             onClick={(e) => {
               e.preventDefault();
-              handleSwapClick(e, seatInfo.id);
+              void handleSwapClick(e, seatInfo);
             }}
             className={`absolute top-7.5 py-1.25 px-2.25 rounded-md border-2 transition-colors cursor-pointer ${colorClass
               .replace("bg-", "bg-white ")
@@ -437,32 +406,7 @@ export default function ClassroomGrid({
               <LockOpen className="w-3 h-3" />
             )}
           </button>
-          <button
-            onMouseEnter={(e) => e.stopPropagation()}
-            disabled={isPending}
-            onClick={(e) => {
-              e.preventDefault();
-              if (confirm("정말로 이 좌석 정보를 삭제하시겠습니까?")) {
-                startTransition(async () => {
-                  try {
-                    await deleteSeatInfo(seatInfo.id);
-                  } catch (err: any) {
-                    alert(`삭제 에러: ${err.message}`);
-                  }
-                });
-              }
-            }}
-            className={`absolute top-14.5 p-1 rounded-full border-2 transition-colors cursor-pointer ${colorClass
-              .replace("bg-", "bg-white ")
-              .replace("text-", "text-slate-900 ")
-              .replace(
-                "ring-3",
-                "ring-2"
-              )} ${tile.num % 6 === 4 ? "-left-9" : "-left-4 "}`}
-            title="좌석 삭제"
-          >
-            <Trash className="w-3 h-3" />
-          </button></>
+			</>
         )}
       </div>
     );

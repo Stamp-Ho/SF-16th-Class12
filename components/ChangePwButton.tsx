@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { KeyRound } from 'lucide-react';
 import ChangePwModal from './ChangePwModal';
-export default function ChangePwButton() {
+export default function ChangePwButton({ username }: { username: string }) {
 	const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 	return (
 		<>
@@ -16,7 +16,10 @@ export default function ChangePwButton() {
 				<span className="hidden sm:inline">비밀번호 변경</span>
 			</button>
 			{isPasswordModalOpen && (
-				<ChangePwModal onClose={() => setIsPasswordModalOpen(false)} />
+				<ChangePwModal
+					username={username}
+					onClose={() => setIsPasswordModalOpen(false)}
+				/>
 			)}
 		</>
 	);

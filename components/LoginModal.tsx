@@ -1,56 +1,31 @@
 'use client';
 
-import { useState, useTransition, useEffect } from 'react';
-import { createClient } from '@/utils/supabase/client';
-import { loginWithName } from '@/app/(auth)/actions';
+import { useState } from 'react';
+import { useAuth } from '@/components/AuthProvider';
 import { LogIn, Loader2, Lock, User } from 'lucide-react';
 
 export default function LoginModal() {
-	const [isPending, startTransition] = useTransition();
+	const { login } = useAuth();
+	const [isPending, setIsPending] = useState(false);
 	const [errorMessage, setErrorMessage] = useState('');
-	const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
-	const [selectedClassId, setSelectedClassId] = useState('');
 
-	const fetchClasses = async () => {
-		const supabase = createClient();
-		const { data: classes, error } = await supabase
-			.from('classes')
-			.select('id, name')
-			.order('name', { ascending: true });
-		if (error) {
-			throw new Error(`반 목록 조회 실패: ${error.message}`);
-		}
-		return classes || [];
-	};
-
-	useEffect(() => {
-		startTransition(async () => {
-			try {
-				const fetchedClasses = await fetchClasses();
-				setClasses(fetchedClasses);
-				const defaultClass = fetchedClasses.find((c) =>
-					c.name.includes('서울 12반'),
-				);
-				if (defaultClass) {
-					setSelectedClassId(defaultClass.id);
-				}
-			} catch (err: any) {
-				setErrorMessage(`반 목록 조회 실패: ${err.message}`);
-			}
-		});
-	}, []);
-
-	const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		setErrorMessage('');
-
 		const formData = new FormData(e.currentTarget);
-		startTransition(async () => {
-			const result = await loginWithName(formData);
-			if (result?.error) {
-				setErrorMessage(result.error);
-			}
-		});
+		const username = String(formData.get('username') ?? '').trim();
+		const password = String(formData.get('password') ?? '');
+
+		setIsPending(true);
+		try {
+			await login(username, password);
+		} catch (error) {
+			setErrorMessage(
+				error instanceof Error ? error.message : '로그인에 실패했습니다.',
+			);
+		} finally {
+			setIsPending(false);
+		}
 	};
 
 	return (
@@ -64,36 +39,21 @@ export default function LoginModal() {
 						SSAFY 504 로그인
 					</h2>
 					<p className="text-sm text-slate-500">
-						서비스 이용을 위해 이름과 비밀번호를 입력하세요.
+						서비스 이용을 위해 아이디와 비밀번호를 입력하세요.
 					</p>
 				</div>
 
 				<form onSubmit={handleSubmit} className="space-y-4">
-					{/* 반 선택 필드 */}
-					<select
-						name="classId"
-						value={selectedClassId}
-						onChange={(e) => setSelectedClassId(e.target.value)}
-						className="w-full text-sm px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-						required
-					>
-						<option value="">반을 선택하세요</option>
-						{classes.map((cls) => (
-							<option key={cls.id} value={cls.id}>
-								{cls.name}
-							</option>
-						))}
-					</select>
 					<div>
 						<label className="block text-xs font-semibold text-slate-600 mb-1">
-							이름
+							아이디
 						</label>
 						<div className="relative">
 							<User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
 							<input
 								type="text"
-								name="name"
-								placeholder="홍길동"
+								name="username"
+								placeholder="아이디 입력"
 								className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
 								required
 							/>

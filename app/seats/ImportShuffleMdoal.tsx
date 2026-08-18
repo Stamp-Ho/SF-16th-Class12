@@ -5,12 +5,10 @@ import { getRandomDrawHistory } from "../shuffle/actions";
 
 export default function ImportShuffleModal({
   setDrawHistory,
-  onClose,
-  classId
+  onClose
 }: {
   setDrawHistory: (draws: any) => void;
   onClose: () => void;
-  classId: string;
 }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +18,7 @@ export default function ImportShuffleModal({
   useEffect(() => {
     const fetchDrawHistory = async () => {
       try {
-        const draws = await getRandomDrawHistory(classId);
+        const draws = await getRandomDrawHistory();
         setDraws(draws);
       } catch (err: any) {
         setError(`추첨 이력 로드 실패: ${err.message}`);
@@ -28,7 +26,7 @@ export default function ImportShuffleModal({
     };
 
     fetchDrawHistory();
-  }, [classId]);
+  }, []);
 
   const handleSelectSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

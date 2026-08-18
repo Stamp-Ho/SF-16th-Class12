@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import YouTube, { YouTubeProps, YouTubePlayer } from 'react-youtube';
 import {
 	completeSongRecord,
@@ -19,16 +19,16 @@ import {
 	Volume2,
 	VolumeX,
 } from 'lucide-react';
-import { createClient } from '@/utils/supabase/client';
 
 export default function StagePage({
 	stageData,
 	user,
+	onFinished,
 }: {
-	stageData: any;
-	user: { name: string; role: string; classId: string };
+	stageData: { id: number; userName: string; songName: string | null; youtubeUrl: string | null };
+	user: { name: string; role: string };
+	onFinished: () => void;
 }) {
-	const supabase = useMemo(() => createClient(), []);
 	const chatListRef = useRef<HTMLDivElement | null>(null);
 	const shouldStickToBottomRef = useRef(true);
 	const pendingAutoScrollRef = useRef(false);
@@ -40,7 +40,7 @@ export default function StagePage({
 	const [showFullScreen, setShowFullScreen] = useState(true);
 	// 채팅 상태
 	const [messages, setMessages] = useState<
-		{ id: string; sender: string; text: string; time: string }[]
+		{ id: number | string; sender: string; text: string; time: string }[]
 	>([
 		{
 			id: '1',
@@ -88,7 +88,8 @@ export default function StagePage({
 
 	const handleFinishSong = async () => {
 		try {
-			await completeSongRecord(stageData.id, user.classId);
+			await completeSongRecord(stageData.id);
+			onFinished();
 		} catch (err) {
 			console.error('노래 종료 실패:', err);
 		}
@@ -100,7 +101,8 @@ export default function StagePage({
 
 		await sendChatMessage({
 			songId: stageData.id,
-			senderName: nickName.trim() || user.name,
+			userName: user.name,
+			nickname: nickName.trim() || user.name,
 			message: chatInput,
 		});
 
@@ -129,11 +131,11 @@ export default function StagePage({
 		// 기존 채팅 불러오기
 		getChatMessages(stageData.id).then((initialData) => {
 			setMessages(
-				initialData.map((msg: any) => ({
+				initialData.map((msg) => ({
 					id: msg.id,
-					sender: msg.sender_name,
+					sender: msg.nickname,
 					text: msg.message,
-					time: new Date(msg.created_at).toLocaleTimeString('ko-KR', {
+					time: new Date(msg.createdAt).toLocaleTimeString('ko-KR', {
 						hour: '2-digit',
 						minute: '2-digit',
 					}),
@@ -146,45 +148,7 @@ export default function StagePage({
 			});
 		});
 
-		// 해당 song_id 세션에 대한 INSERT 이벤트만 Realtime 구독
-		const channel = supabase
-			.channel(`karaoke_chats`)
-			.on(
-				'postgres_changes',
-				{
-					event: 'INSERT',
-					schema: 'public',
-					table: 'karaoke_chats',
-					filter: `song_id=eq.${stageData.id}`, // 해당 노래 세션 채팅만 수신
-				},
-				(payload) => {
-					const newChat = payload.new;
-					const shouldAutoScroll = shouldStickToBottomRef.current;
-
-					if (shouldAutoScroll) {
-						pendingAutoScrollRef.current = true;
-					}
-
-					setMessages((prev) => [
-						...prev,
-						{
-							id: newChat.id,
-							sender: newChat.sender_name,
-							text: newChat.message,
-							time: new Date(newChat.created_at).toLocaleTimeString('ko-KR', {
-								hour: '2-digit',
-								minute: '2-digit',
-							}),
-						},
-					]);
-				},
-			)
-			.subscribe();
-
-		return () => {
-			supabase.removeChannel(channel);
-		};
-	}, [stageData.id, supabase]);
+	}, [stageData.id]);
 
 	useEffect(() => {
 		if (!pendingAutoScrollRef.current) return;
@@ -232,8 +196,7 @@ export default function StagePage({
 	};
 
 	const videoId =
-		stageData.youtube_url?.split('v=')[1]?.split('&')[0] ||
-		stageData.youtube_video_id;
+		stageData.youtubeUrl?.split('v=')[1]?.split('&')[0];
 
 	return (
 		<main className="min-h-screen min-w-screen bg-background text-foregroundflex items-center justify-center font-sans overflow-hidden transition-colors duration-200">
@@ -256,11 +219,11 @@ export default function StagePage({
 										NOW SINGING
 									</span>
 									<h1 className="text-lg font-bold text-foreground truncate">
-										{stageData.name}님의 무대
+										{stageData.userName}님의 무대
 									</h1>
 								</div>
 								<p className="text-xs text-foreground/60 mt-0.5 truncate">
-									🎵 {stageData.song_name || '유튜브 노래방 반주'}
+									🎵 {stageData.songName || '유튜브 노래방 반주'}
 								</p>
 							</div>
 						</div>

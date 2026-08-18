@@ -1,97 +1,29 @@
 "use client";
-import { useState, useTransition } from "react";
+
+import { useState } from "react";
+import { Loader2, X } from "lucide-react";
 import { bulkRegisterUsers } from "./actions";
-import { UserPlus, Loader2, CheckCircle2 } from "lucide-react";
 
-export default function BulkRegisterForm({
-  classInfo,
-  onRegisterSuccess
-}: {
-  classInfo: { id: string; name: string };
-  onRegisterSuccess?: () => void;
-}) {
-  const [isPending, startTransition] = useTransition();
+export default function BulkRegisterForm({ onClose, onRegistered }: { onClose: () => void; onRegistered: () => Promise<void> }) {
+  const [value, setValue] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 일괄 회원 등록 상태
-  const [userNames, setUserNames] = useState("");
-  const [userMessage, setUserMessage] = useState("");
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    const usernames = value.split(/[\s,]+/).map((username) => username.trim()).filter(Boolean);
+    if (usernames.length === 0) return;
+    setIsSubmitting(true);
+    try {
+      const users = await bulkRegisterUsers(usernames);
+      alert(`${users.length}명을 등록했습니다.`);
+      await onRegistered();
+      onClose();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "사용자를 등록하지 못했습니다.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
-  // 1. 회원 일괄 등록 핸들러
-  const handleUserSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setUserMessage("");
-
-    startTransition(async () => {
-      try {
-        const res = await bulkRegisterUsers(
-          userNames,
-          classInfo.name,
-          classInfo.id
-        );
-        setUserMessage(
-          `성공: ${res.successCount}명 / 실패: ${res.failCount}명`
-        );
-        setUserNames("");
-        onRegisterSuccess?.();
-      } catch (err: any) {
-        setUserMessage(`오류 발생: ${err.message}`);
-      }
-    });
-  };
-
-  return (
-    <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-      <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-        <UserPlus className="w-5 h-5 text-indigo-600" />
-        <h2 className="font-bold text-slate-800">회원 일괄 등록</h2>
-      </div>
-
-      <form onSubmit={handleUserSubmit} className="space-y-4">
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1">
-            반 이름
-          </label>
-          <div className="text-sm font-medium font-bold text-slate-500 mb-4">
-            {classInfo.name}
-          </div>
-
-          <label className="block text-xs font-semibold text-slate-600 mb-1">
-            이름 목록 (Comma-separated)
-          </label>
-          <textarea
-            rows={4}
-            value={userNames}
-            onChange={(e) => setUserNames(e.target.value)}
-            placeholder="홍길동, 김철수, 이영희..."
-            className="w-full text-sm p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            required
-          />
-          <p className="text-[11px] text-slate-400 mt-1">
-            * 초기 비밀번호는 모두{" "}
-            <code className="bg-slate-100 px-1 rounded">ssafy16</code>로
-            설정됩니다.
-          </p>
-        </div>
-
-        <button
-          type="submit"
-          disabled={isPending}
-          className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm py-2.5 rounded-xl transition-colors disabled:opacity-50"
-        >
-          {isPending ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            "일괄 계정 생성"
-          )}
-        </button>
-
-        {userMessage && (
-          <div className="p-3 bg-indigo-50 text-indigo-700 text-xs rounded-xl flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-            {userMessage}
-          </div>
-        )}
-      </form>
-    </section>
-  );
+  return <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4"><form onSubmit={submit} className="w-full max-w-md bg-white rounded-xl p-6 space-y-4"><div className="flex justify-between"><h3 className="font-bold">회원 일괄 등록</h3><button type="button" onClick={onClose}><X className="w-5 h-5" /></button></div><textarea required rows={5} value={value} onChange={(event) => setValue(event.target.value)} placeholder="user1, user2, user3" className="w-full border rounded-lg p-3 text-sm" /><p className="text-xs text-slate-500">초기 비밀번호는 `ssafy16`입니다.</p><button disabled={isSubmitting} className="w-full py-2.5 bg-indigo-600 text-white rounded-lg">{isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "등록"}</button></form></div>;
 }

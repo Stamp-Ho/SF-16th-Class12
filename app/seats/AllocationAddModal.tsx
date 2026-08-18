@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createNewSeatRound } from "./actions";
-import { createClient } from "@/utils/supabase/client";
+import { createNewSeatRound, type SeatRound } from "./actions";
 import {
   Loader2,
   ChevronLeft,
@@ -20,9 +19,8 @@ import { getTargetUsers } from "../shuffle/actions";
 
 interface AllocationAddModalProps {
   onClose: () => void;
-  rounds: any[];
+  rounds: SeatRound[];
   loadData: () => Promise<void>;
-  classId: string;
 }
 
 // const ringOrder = [
@@ -53,8 +51,7 @@ const dateList = [
 export default function AllocationAddModal({
   onClose,
   rounds,
-  loadData,
-  classId
+  loadData
 }: AllocationAddModalProps) {
   const initialNextRound = rounds.length + 1;
   const [targetRound, setTargetRound] = useState<number>(initialNextRound);
@@ -72,7 +69,7 @@ export default function AllocationAddModal({
 
   useEffect(() => {
     const getProfiles = async () => {
-      const profiles = await getTargetUsers(classId);
+      const profiles = await getTargetUsers();
       if (profiles.length % 2 == 1)
         profiles.push({ name: "빈자리", id: "empty", role: "user" });
       setFlatMembers(
@@ -188,25 +185,17 @@ export default function AllocationAddModal({
   const handleLoadLastRoundFromDB = async () => {
     setIsLoadingLast(true);
     try {
-      const supabase = createClient();
-      // seat_allocations 테이블에서 가장 최신/높은 round_number 구하기
-      const { data, error } = await supabase
-        .from("seat_allocations")
-        .select("round_number, current_group_id, initial_groups")
-        .order("round_number", { ascending: false })
-        .limit(30);
-
-      if (error) throw error;
-
-      if (!data || data.length === 0) {
+      if (rounds.length === 0) {
         alert("저장된 지난 회차 배정 데이터가 없습니다.");
         return;
       }
-      const latestRoundNum = data[0].round_number;
-      const latestRoundSeats = data[0].initial_groups.reduce(
-        (acc: string[], group: { m1?: string; m2?: string }) => {
+      const latestRound = [...rounds].sort((a, b) => b.roundNumber - a.roundNumber)[0];
+      const latestRoundNum = latestRound.roundNumber;
+      const latestRoundSeats = latestRound.groups.reduce<string[]>(
+  		(acc, group) => {
           if (group.m1) acc.push(group.m1);
           if (group.m2) acc.push(group.m2);
+					if (group.m3) acc.push(group.m3);
           return acc;
         },
         [] as string[]
@@ -227,8 +216,8 @@ export default function AllocationAddModal({
         );
         alert(`최신(${latestRoundNum}회차) 데이터를 성공적으로 불러왔습니다!`);
       }
-    } catch (err: any) {
-      alert(`불러오기 실패: ${err.message}`);
+    } catch (error) {
+      alert(`불러오기 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`);
     } finally {
       setIsLoadingLast(false);
     }
@@ -289,7 +278,6 @@ export default function AllocationAddModal({
         targetRound,
         roundTitle,
         flatMembers.map((m) => (m.status ? m.name : "")),
-        classId
       );
 
       onClose();
@@ -540,7 +528,6 @@ export default function AllocationAddModal({
           <ImportShuffleModal
             setDrawHistory={setDrawHistory}
             onClose={() => setIsSelectShuffleModalOpen(false)}
-            classId={classId}
           />
         )}
       </div>

@@ -1,12 +1,11 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, DiscAlbum, MicVocal, Play } from 'lucide-react';
 import Link from 'next/link';
-import { addSongRecord, getSongRecords } from './actions';
+import { addSongRecord, getSongRecords, type SongRecord } from './actions';
 import SingerQueueSection from './SingerQueueSection';
-import { createClient } from '@/utils/supabase/client';
 
 const RecordModal = dynamic(() => import('./RecordModal'), { ssr: false });
 const SearchModal = dynamic(() => import('./SearchModal'), { ssr: false });
@@ -16,10 +15,11 @@ const RandomSelectModal = dynamic(() => import('./RandomSelectModal'), {
 
 export default function SongMain({
 	user,
+	onSongStarted,
 }: {
-	user: { name: string; role: string; classId: string };
+		user: { name: string; role: string };
+		onSongStarted: (song: SongRecord) => void;
 }) {
-	const supabase = useMemo(() => createClient(), []);
 	const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
 	const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
 	const [isRandomSelectModalOpen, setIsRandomSelectModalOpen] = useState(false);
@@ -29,58 +29,36 @@ export default function SongMain({
 	const [addFront, setAddFront] = useState(false); // 우선 예약 여부 상태
 
 	const [singerList, setSingerList] = useState<
-		{ id: string; name: string; reason: string }[]
+		{ id: number; name: string; reason: string; displayOrder: number }[]
 	>([]);
 
+	const toPendingSingers = (data: SongRecord[]) =>
+		data
+			.filter((record) => record.status === 'pending')
+			.map((record) => ({
+				id: record.id,
+				name: record.userName,
+				reason: record.reason,
+				displayOrder: record.displayOrder,
+			}));
+
 	const fetchSingerList = async () => {
-		try {
-			const data = await getSongRecords(user.classId);
-			setSingerList(
-				data
-					.filter((record) => record.status === 'pending')
-					.map((record) => ({
-						id: record.id,
-						name: record.name,
-						reason: record.reason,
-					})),
-			);
-		} catch (error) {
-			console.error(error);
-			setSingerList([]); // 오류 발생 시 빈 배열로 초기화
-		}
+		const data = await getSongRecords();
+		setSingerList(toPendingSingers(data));
 	};
 	useEffect(() => {
-		fetchSingerList();
-	}, [user.classId]);
-
-	useEffect(() => {
-		if (!user.classId) return;
-		fetchSingerList(); // 초기 로드 시 한 번 호출
-		const channel = supabase
-			.channel(`song_records`)
-			.on(
-				'postgres_changes',
-				{ event: '*', schema: 'public', table: 'song_records' },
-				() => {
-					fetchSingerList();
-				},
-			)
-			.subscribe();
-		return () => {
-			supabase.removeChannel(channel);
-		};
-	}, [user.classId]);
+		getSongRecords()
+			.then((data) => setSingerList(toPendingSingers(data)))
+			.catch((error) => console.error(error));
+	}, []);
 
 	const onSubmitAddSinger = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (!newSingerName.trim()) return;
 		try {
 			await addSongRecord(
-				user.classId,
-
 				newSingerName,
 				newSingerReason,
-				addFront,
 			);
 			setNewSingerName('');
 			setNewSingerReason('');
@@ -279,7 +257,6 @@ export default function SongMain({
 				<SingerQueueSection
 					singerList={singerList}
 					setSingerList={setSingerList}
-					user={user}
 					isAdmin={isAdmin}
 					fetchSingerList={fetchSingerList}
 				/>
@@ -288,18 +265,17 @@ export default function SongMain({
 				{isSearchModalOpen && (
 					<SearchModal
 						targetRecordId={singerList[0]?.id}
+						onSongStarted={onSongStarted}
 						onClose={() => setIsSearchModalOpen(false)}
 					/>
 				)}
 				{isRecordModalOpen && (
 					<RecordModal
 						onClose={() => setIsRecordModalOpen(false)}
-						classId={user.classId}
 					/>
 				)}
 				{isRandomSelectModalOpen && (
 					<RandomSelectModal
-						classId={user.classId}
 						setSingerName={setNewSingerName}
 						setSingerReason={setNewSingerReason}
 						onClose={() => setIsRandomSelectModalOpen(false)}

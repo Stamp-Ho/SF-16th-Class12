@@ -1,22 +1,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getSongRecords } from "./actions";
+import { getSongRecords, type SongRecord } from "./actions";
 import { CheckCircle2, Music2, XCircle, X } from "lucide-react";
 
 export default function RecordModal({
-  onClose,
-  classId
+  onClose
 }: {
   onClose: () => void;
-  classId: string;
 }) {
-  const [records, setRecords] = useState<any[]>([]);
+  const [records, setRecords] = useState<SongRecord[]>([]);
 
   useEffect(() => {
     const fetchSingerList = async () => {
       try {
-        const data = await getSongRecords(classId);
+        const data = await getSongRecords();
         setRecords(
           (data ?? [])
             .filter(
@@ -25,8 +23,8 @@ export default function RecordModal({
             )
             .sort(
               (a, b) =>
-                new Date(b.updated_at).getTime() -
-                new Date(a.updated_at).getTime()
+                new Date(b.createdAt).getTime() -
+                new Date(a.createdAt).getTime()
             )
         );
         //'pending', 'singing', 'completed', 'canceled'
@@ -36,7 +34,7 @@ export default function RecordModal({
       }
     };
     fetchSingerList();
-  }, [classId]);
+  }, []);
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -88,12 +86,12 @@ export default function RecordModal({
                     <div className="flex flex-col min-w-0 mr-3">
                       <div className="flex items-center gap-2 mb-0.5">
                         <span className="font-bold text-slate-700 text-sm truncate">
-                          {record.name}
+                          {record.userName}
                         </span>
                       </div>
-                      {record.song_name && (
+                        {record.songName && (
                         <p className="text-slate-900 font-bold text-md truncate w-150">
-                          {record.song_name}
+                          {record.songName}
                         </p>
                       )}
                       {record.reason && (

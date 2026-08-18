@@ -4,12 +4,12 @@ import { useState } from "react";
 import { X, Calendar, User, FileText } from "lucide-react";
 
 interface DrawHistoryItem {
-  id: string;
+  id: number;
   title: string;
   description: string | null;
   result_data: { order: number; name: string }[];
   created_at: string;
-  creator: { name: string } | null;
+  creator: null;
 }
 
 export default function HistoryModal({
@@ -21,9 +21,9 @@ export default function HistoryModal({
   onClose: () => void;
   history: DrawHistoryItem[];
 }) {
-  const [selectedDraw, setSelectedDraw] = useState<DrawHistoryItem | null>(
-    history[0] || null
-  );
+  const [selectedDrawId, setSelectedDrawId] = useState<number | null>(null);
+  const selectedDraw =
+    history.find((item) => item.id === selectedDrawId) ?? history[0] ?? null;
 
   if (!isOpen) return null;
 
@@ -54,7 +54,7 @@ export default function HistoryModal({
                 return (
                   <button
                     key={item.id}
-                    onClick={() => setSelectedDraw(item)}
+                    onClick={() => setSelectedDrawId(item.id)}
                     className={`w-full text-left p-3 rounded-xl transition-all border ${
                       isSelected
                         ? "bg-white border-indigo-300 shadow-sm text-indigo-900"
@@ -91,8 +91,7 @@ export default function HistoryModal({
                   )}
                   <div className="flex items-center gap-3 text-[11px] text-slate-400 mt-2 border-b border-slate-100 pb-3">
                     <span className="flex items-center gap-1">
-                      <User className="w-3 h-3" /> 생성자:{" "}
-                      {selectedDraw.creator?.name || "관리자"}
+                      <User className="w-3 h-3" /> 생성자: 관리자
                     </span>
                     <span>•</span>
                     <span>

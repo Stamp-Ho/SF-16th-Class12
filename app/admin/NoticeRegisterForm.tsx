@@ -4,11 +4,7 @@ import { useState, useTransition } from "react";
 import { BookmarkPlus, Loader2, CheckCircle2 } from "lucide-react";
 import { createDashboardLink } from "./links/actions";
 
-export default function NoticeRegisterForm({
-  classId
-}: {
-  classId: string | null;
-}) {
+export default function NoticeRegisterForm() {
   const [isPending, startTransition] = useTransition();
 
   const [linkTitle, setLinkTitle] = useState("");
@@ -27,14 +23,13 @@ export default function NoticeRegisterForm({
           title: linkTitle,
           url: linkUrl,
           description: linkDesc,
-          class_id: classId
         });
         setLinkMessage("새로운 링크가 추가되었습니다.");
         setLinkTitle("");
         setLinkUrl("");
         setLinkDesc("");
-      } catch (err: any) {
-        setLinkMessage(`오류 발생: ${err.message}`);
+      } catch (error) {
+        setLinkMessage(`오류 발생: ${error instanceof Error ? error.message : "알 수 없는 오류"}`);
       }
     });
   };
