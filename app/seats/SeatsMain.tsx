@@ -171,6 +171,7 @@ export default function SeatsMain() {
 						<div className="lg:col-span-2">
 							<ClassroomGrid
 								seatList={selectedRound.seats}
+								roundId={selectedRound.id}
 								myGroupId={myGroupId}
 								myGroupName={myGroupName}
 								currentUserName={currentUser.name}

@@ -10,10 +10,11 @@ import {
   RotateCcw,
   Edit3,
   Trash2,
-  GripVertical
+  GripVertical,
+  PlusCircleIcon
 } from "lucide-react";
 import { LayoutGroup, motion } from "framer-motion";
-import ImportShuffleModal from "./ImportShuffleMdoal"; 
+import ImportShuffleModal from "./ImportShuffleModal"; 
 import { generateRingOrder, generateReverseRingOrder } from "./utils/order";
 import { getTargetUsers } from "../shuffle/actions";
 
@@ -89,6 +90,7 @@ export default function AllocationAddModal({
 
   // 💡 커스텀 편집 모드 토글
   const [isCustomMode, setIsCustomMode] = useState(false);
+  const [isRefreshingMembers, setIsRefreshingMembers] = useState(false);
   // 드래그 중인 인덱스
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
@@ -220,6 +222,48 @@ export default function AllocationAddModal({
       alert(`불러오기 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`);
     } finally {
       setIsLoadingLast(false);
+    }
+  };
+
+  // 1.5 조 삭제 처리 (조 단위 삭제)
+  const handleRemoveGroup = (pairIdx: number) => {
+    const idx1 = pairIdx * 2;
+    const idx2 = pairIdx * 2 + 1;
+    setFlatMembers((prev) =>
+      prev.filter((_, idx) => idx !== idx2 && idx !== idx1)
+    );
+  };
+
+  const handleRefreshMembers = async () => {
+    setIsRefreshingMembers(true);
+    try {
+      const profiles = await getTargetUsers();
+      const currentNames = new Set(
+        flatMembers
+          .filter(({ name }) => name !== "빈자리")
+          .map(({ name }) => name)
+      );
+      const missingMembers = profiles.filter(
+        ({ name }) => !currentNames.has(name)
+      );
+
+      if (missingMembers.length === 0) {
+        alert("새로 추가된 사용자가 없습니다.");
+        return;
+      }
+
+      setFlatMembers((prev) => [
+        ...prev.filter(({ name }) => name !== "빈자리"),
+        ...missingMembers.map(({ name }) => ({ name, status: true }))
+      ]);
+    } catch (error) {
+      alert(
+        `사용자 새로고침 실패: ${
+          error instanceof Error ? error.message : "알 수 없는 오류"
+        }`
+      );
+    } finally {
+      setIsRefreshingMembers(false);
     }
   };
 
@@ -422,14 +466,29 @@ export default function AllocationAddModal({
           <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-100 flex-1 flex flex-col min-h-0">
             {/* 헤더 */}
             <div className="grid grid-cols-12 text-[11px] font-bold text-slate-400 pb-2 border-b border-slate-200/60 px-2 text-center">
-              <div className="col-span-2 flex items-center justify-center gap-1">
-                <Hash className="w-3 h-3" /> 조
+              <div className="col-span-2 flex items-center justify-center gap-1 relative">
+                <Hash className="w-3 h-3 -ml-3" /> 조
+                {isCustomMode && (
+                  <button
+                    type="button"
+                    onClick={handleRefreshMembers}
+                    disabled={isRefreshingMembers}
+                    className="absolute right-2.5 bottom-0.25 text-indigo-500 hover:text-indigo-700 disabled:opacity-50"
+                    title="사용자 목록 새로고침"
+                  >
+                    <PlusCircleIcon
+                      className={`w-4 h-4 ${
+                        isRefreshingMembers ? "animate-spin" : ""
+                      }`}
+                    />
+                  </button>
+                )}
               </div>
               <div className="col-span-5">첫 번째 사람 (A)</div>
               <div className="col-span-5">두 번째 사람 (B)</div>
             </div>
 
-            <div className="flex-1 overflow-y-auto pr-1 pt-1 space-y-1.5">
+            <div className="flex-1 overflow-y-auto pr-1 pt-1 space-y-1.5  overflow-hidden">
               <LayoutGroup id="seat-allocation-group">
                 {currentPairs.map(([p1, p2], pairIdx) => {
                   const idx1 = pairIdx * 2;
@@ -441,10 +500,20 @@ export default function AllocationAddModal({
                       className="grid grid-cols-12 items-center text-xs gap-2 py-0.5 px-1"
                     >
                       {/* 1컬럼: 조 이름 */}
-                      <div className="col-span-2 text-center">
+                      <div className="col-span-2 text-center relative group">
                         <span className="font-mono text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full inline-block">
                           {pairIdx + 1}조
                         </span>
+                        {isCustomMode &&  (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveGroup(pairIdx)}
+                              className="absolute bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                              title="삭제"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
                       </div>
 
                       {/* 2컬럼: 첫 번째 사람 셀 */}

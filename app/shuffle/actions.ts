@@ -27,7 +27,7 @@ export async function getTargetUsers(classId?: string) {
   const users = await apiRequest<UserResponse[]>("/api/users");
 
   return users
-    .filter((user) => user.status === "ACTIVE")
+    .filter((user) => user.status === "ACTIVE" && user.role !== "teacher")
     .map((user) => ({
       id: String(user.id),
       name: user.username,

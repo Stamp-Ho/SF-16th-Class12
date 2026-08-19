@@ -83,7 +83,7 @@ function toSeatData(allocation: AllocationResponse, groups: GroupResponse[]): Se
 }
 
 export async function getSeatRounds() {
-  const rounds = await apiRequest<RoundResponse[]>("/api/seats/rounds");
+  const rounds = (await apiRequest<RoundResponse[]>("/api/seats/rounds")).sort((a, b) => b.round - a.round);
 
   return Promise.all(
     rounds.map(async (round): Promise<SeatRound> => {
@@ -155,17 +155,17 @@ export async function placeOrMoveSeatBid(
 ) {
   return apiRequest<AllocationResponse>(`/api/seats/allocations/${allocationId}/bid`, {
     method: "POST",
-    body: JSON.stringify({ userName, nextGroupId: groupId }),
+    body: JSON.stringify({ userName, nextGroupId: groupId, priceChange: 500 }),
   });
 }
 
-export async function swapSeatPositions(seat: SeatData) {
+export async function swapSeatPositions(seat: SeatData, swapLeft:boolean) {
   return apiRequest<AllocationResponse>(`/api/seats/allocations/${seat.id}/details`, {
     method: "PATCH",
     body: JSON.stringify({
-      memberLeft: seat.member_right,
-      memberMiddle: seat.member_middle,
-      memberRight: seat.member_left,
+      memberLeft: swapLeft ? seat.member_middle : seat.member_left,
+      memberMiddle: swapLeft ? seat.member_left : seat.member_right,
+      memberRight: swapLeft ? seat.member_right : seat.member_middle,
     }),
   });
 }
@@ -180,9 +180,15 @@ export async function deleteSeatRound(roundId: number) {
   return apiRequest<void>(`/api/seats/rounds/${roundId}`, { method: "DELETE" });
 }
 
-export async function toggleSeatLock(_seatId: number, _lockStatus: boolean) {
-  void _seatId;
-  void _lockStatus;
+export async function toggleSeatLock(_seatId: number) {
+  return apiRequest<void>(`/api/seats/allocations/${_seatId}/lock`, {
+    method: "PATCH",
+    body:JSON.stringify({}),
+  });
+}
+
+export async function initSeatInfo(seatId: number) {
+  return apiRequest<void>(`/api/seats/allocations/${seatId}`, { method: "DELETE" });
 }
 
 export async function processGamble(
@@ -194,4 +200,12 @@ export async function processGamble(
     method: "POST",
     body: JSON.stringify({ userName, nextGroupId: groupId }),
   });
+}
+
+
+/**
+ * 경매/도박 기록 가져오기
+ */
+export async function getBidHistory(roundId: number) {
+  return apiRequest<any[]>(`/api/seats/rounds/${roundId}/histories`);
 }
