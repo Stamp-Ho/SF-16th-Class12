@@ -22,7 +22,6 @@ interface AllocationAddModalProps {
   onClose: () => void;
   rounds: any[];
   loadData: () => Promise<void>;
-  classId: string;
 }
 
 // const ringOrder = [
@@ -54,7 +53,6 @@ export default function AllocationAddModal({
   onClose,
   rounds,
   loadData,
-  classId
 }: AllocationAddModalProps) {
   const initialNextRound = rounds.length + 1;
   const [targetRound, setTargetRound] = useState<number>(initialNextRound);
@@ -72,7 +70,7 @@ export default function AllocationAddModal({
 
   useEffect(() => {
     const getProfiles = async () => {
-      const profiles = await getTargetUsers(classId);
+      const profiles = await getTargetUsers();
       if (profiles.length % 2 == 1)
         profiles.push({ name: "빈자리", id: "empty", role: "user" });
       setFlatMembers(
@@ -288,8 +286,7 @@ export default function AllocationAddModal({
       const result = await createNewSeatRound(
         targetRound,
         roundTitle,
-        flatMembers.map((m) => (m.status ? m.name : "")),
-        classId
+        flatMembers.map((m) => (m.status ? m.name : ""))
       );
 
       onClose();
@@ -539,8 +536,7 @@ export default function AllocationAddModal({
         {isSelectShuffleModalOpen && (
           <ImportShuffleModal
             setDrawHistory={setDrawHistory}
-            onClose={() => setIsSelectShuffleModalOpen(false)}
-            classId={classId}
+            onClose={() => setIsSelectShuffleModalOpen(false)} 
           />
         )}
       </div>

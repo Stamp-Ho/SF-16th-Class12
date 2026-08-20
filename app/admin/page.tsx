@@ -33,7 +33,6 @@ export default async function AdminPage({
     <AdminView
       role={profile?.role}
       myId={user.id}
-      classId={profile?.class_id}
     />
   );
 }

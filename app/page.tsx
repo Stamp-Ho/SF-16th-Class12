@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/server';
-import LoginModal from '@/components/LoginModal';
+import LoginModal from '@/app/(auth)/LoginModal';
 import { logout } from '@/app/(auth)/actions';
 import {
 	Armchair,

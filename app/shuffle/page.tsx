@@ -1,5 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
-import LoginModal from "@/components/LoginModal";
+import LoginModal from "@/app/(auth)/LoginModal";
 import ShuffleMain from "./ShuffleMain";
 
 export default async function RandomizerPage() {

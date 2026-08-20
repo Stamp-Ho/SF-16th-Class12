@@ -104,8 +104,7 @@ export default function ClassroomGrid({
   myGroupId,
   myGroupName,
   currentUserName,
-  isAdmin,
-  classId,
+  isAdmin, 
   loadData
 }: {
   roundNumber: number;
@@ -113,8 +112,7 @@ export default function ClassroomGrid({
   myGroupId: string;
   myGroupName: string;
   currentUserName: string;
-  isAdmin: boolean;
-  classId: string;
+  isAdmin: boolean; 
   loadData: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -143,8 +141,7 @@ export default function ClassroomGrid({
         roundNumber,
         code,
         myGroupId,
-        myGroupName,
-        classId
+        myGroupName
       );
 
       if (!res.success) {
@@ -173,8 +170,7 @@ export default function ClassroomGrid({
         roundNumber,
         code,
         targetGroupId,
-        targetGroupName,
-        classId
+        targetGroupName
       );
     } catch (err: any) {
       alert(`드롭 배정 실패: ${err.message}`);

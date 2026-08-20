@@ -36,16 +36,13 @@ interface Profile {
 export default function UserManagementTable({
   initialUsers,
   userRole,
-  myId,
-  classId
+  myId, 
 }: {
   initialUsers: Profile[];
   userRole?: "super_admin" | "class_admin" | "user" | "song_admin";
-  myId?: string;
-  classId: string | null;
+  myId?: string; 
 }) {
   const [users, setUsers] = useState<Profile[]>(initialUsers);
-  const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchClass, setSearchClass] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -64,21 +61,14 @@ export default function UserManagementTable({
   );
 
   const fetchUsers = async () => {
-    const users = await getAllUsers(
-      userRole === "class_admin" ? classId : null
-    );
-    const classes = await getClasses(
-      userRole === "class_admin" ? classId : null
-    );
-    setClasses(classes);
-    if (userRole === "class_admin" && classId) {
-      setSearchClass(classes[0]?.name ?? "");
+    const users = await getAllUsers();
+    if (userRole === "class_admin" ) {
+      setSearchClass();
     }
     setUsers(
       users.map((user) => {
         return {
-          ...user,
-          className: classes.find((cls) => cls.id === user.class_id)?.name ?? ""
+          ...user
         };
       })
     );
@@ -151,35 +141,6 @@ export default function UserManagementTable({
           />
         </div>
 
-        {/* Class 검색 */}
-
-        {userRole === "super_admin" && (
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setSearchClass("")}
-              className={`px-3 py-1 text-[11px] font-medium rounded-lg border transition-colors ${
-                searchClass === ""
-                  ? "bg-indigo-600 border-indigo-600 text-white"
-                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              전체
-            </button>
-            {classes.map(({ id, name }) => (
-              <button
-                key={id}
-                onClick={() => setSearchClass(name)}
-                className={`px-3 py-1 text-[11px] font-medium rounded-lg border transition-colors ${
-                  searchClass === name
-                    ? "bg-indigo-600 border-indigo-600 text-white"
-                    : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                {name}
-              </button>
-            ))}
-          </div>
-        )}
         {/* 등록버튼 */}
         <div>
           {userRole === "super_admin" && (
@@ -231,9 +192,6 @@ export default function UserManagementTable({
                 onClick={() => setIsRegisteringBatch(false)}
               />
               <BulkRegisterForm
-                classInfo={
-                  classes.filter((c) => c.name.includes(searchClass))[0]
-                }
                 onRegisterSuccess={fetchUsers}
               />
             </div>

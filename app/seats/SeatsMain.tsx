@@ -25,7 +25,7 @@ const AllocationAddModal = dynamic(() => import('./AllocationAddModal'), {
 	ssr: false,
 });
 
-export default function SeatsMain({ classId }: { classId: string }) {
+export default function SeatsMain() {
 	const supabase = useMemo(() => createClient(), []);
 
 	const [rounds, setRounds] = useState<any[]>([]);
@@ -72,7 +72,7 @@ export default function SeatsMain({ classId }: { classId: string }) {
 
 	const loadData = useCallback(async () => {
 		try {
-			const data = await getSeatRounds(classId);
+			const data = await getSeatRounds();
 			setRounds(data);
 
 			setSelectedRound((prevSelected: any) => {
@@ -90,7 +90,7 @@ export default function SeatsMain({ classId }: { classId: string }) {
 		} catch (err) {
 			console.error('데이터 로드 에러:', err);
 		}
-	}, [classId]);
+	}, []);
 
 	useEffect(() => {
 		void loadData();
@@ -104,7 +104,6 @@ export default function SeatsMain({ classId }: { classId: string }) {
 					event: 'UPDATE',
 					schema: 'public',
 					table: 'seat_allocations',
-					filter: `class_id=eq.${classId}`,
 				},
 				(payload) => {
 					const updatedSeat = payload.new;
@@ -133,7 +132,7 @@ export default function SeatsMain({ classId }: { classId: string }) {
 		return () => {
 			supabase.removeChannel(channel);
 		};
-	}, [classId, fetchCurrentUser, loadData, supabase]);
+	}, [ fetchCurrentUser, loadData, supabase]);
 
 	// 신규 배정 모달 열기
 	const handleOpenCreateModal = () => {

@@ -20,12 +20,10 @@ export default function AdminControlPanel({
 	roundNumber,
 	isClosed,
 	loadData,
-	classId,
 }: {
 	roundNumber: number;
 	isClosed: boolean;
 	loadData: () => Promise<void>;
-	classId: string;
 }) {
 	const [isPending, startTransition] = useTransition();
 	const router = useRouter();
@@ -39,7 +37,7 @@ export default function AdminControlPanel({
 	const handleToggleStatus = () => {
 		startTransition(async () => {
 			try {
-				await toggleAuctionStatus(roundNumber, !isClosed, classId);
+				await toggleAuctionStatus(roundNumber, !isClosed);
 				await refreshAuctionState();
 			} catch (err: any) {
 				alert(`상태 변경 에러: ${err.message}`);
@@ -60,7 +58,7 @@ export default function AdminControlPanel({
 		startTransition(async () => {
 			try {
 				// 💡 roundNumber만 전달하면 서버가 알아서 미배정 짝을 찾아 매핑합니다!
-				await assignUnallocatedGroupsRandomly(roundNumber, classId);
+				await assignUnallocatedGroupsRandomly(roundNumber);
 				await refreshAuctionState();
 				alert('미배정 그룹 배치가 완료되었습니다!');
 			} catch (err: any) {
@@ -129,7 +127,7 @@ export default function AdminControlPanel({
 						if (confirm('정말로 이 회차의 경매를 삭제하시겠습니까?')) {
 							startTransition(async () => {
 								try {
-									await deleteSeatRound(roundNumber, classId);
+									await deleteSeatRound(roundNumber);
 									await refreshAuctionState();
 									alert('경매가 삭제되었습니다.');
 								} catch (err: any) {

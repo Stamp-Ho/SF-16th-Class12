@@ -6,11 +6,9 @@ import UserManagementTable from "./users/UserManagementTable";
 export default function AdminView({
   role,
   myId,
-  classId
 }: {
   role: "super_admin" | "class_admin" | "user" | "song_admin";
   myId?: string;
-  classId: string | null;
 }) {
   return (
     <main className="min-h-screen bg-slate-50 p-6 md:p-12">
@@ -30,10 +28,9 @@ export default function AdminView({
           initialUsers={[]}
           userRole={role}
           myId={myId}
-          classId={classId}
         />
         <div className="mt-8">
-          <NoticeRegisterForm classId={classId} />
+          <NoticeRegisterForm />
         </div>
       </div>
     </main>
