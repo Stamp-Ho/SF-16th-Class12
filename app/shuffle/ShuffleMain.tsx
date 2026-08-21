@@ -22,7 +22,7 @@ interface UserItem {
   id: string;
   name: string;
 }
-export default function ShuffleMain({ classId }: { classId: string }) {
+export default function ShuffleMain() {
   const [users, setUsers] = useState<UserItem[]>([]);
   const [shuffledList, setShuffledList] = useState<
     { order: number; name: string }[]
@@ -44,7 +44,7 @@ export default function ShuffleMain({ classId }: { classId: string }) {
   useEffect(() => {
     async function load() {
       try {
-        const data = await getTargetUsers(classId || "");
+        const data = await getTargetUsers();
         setUsers(data);
         // 초기 고정 순서 설정
         setShuffledList(
@@ -55,7 +55,7 @@ export default function ShuffleMain({ classId }: { classId: string }) {
       }
     }
     load();
-  }, [classId]);
+  }, []);
 
   // 2. 셔플(Fisher-Yates) 함수 및 애니메이션 효과
   const handleShuffle = () => {
@@ -94,7 +94,7 @@ export default function ShuffleMain({ classId }: { classId: string }) {
 
     startTransition(async () => {
       try {
-        await saveRandomDraw(title, description, shuffledList, classId);
+        await saveRandomDraw(title, description, shuffledList);
         setSaveMessage("추첨 결과가 성공적으로 저장되었습니다!");
         setTitle("");
         setDescription("");
@@ -106,7 +106,7 @@ export default function ShuffleMain({ classId }: { classId: string }) {
   // 4. 히스토리 모달 열기
   const handleOpenHistory = async () => {
     try {
-      const data = await getRandomDrawHistory(classId || "");
+      const data = await getRandomDrawHistory();
       setHistory(data);
       setIsHistoryOpen(true);
     } catch (err: any) {

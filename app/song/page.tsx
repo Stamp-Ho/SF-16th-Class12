@@ -16,7 +16,7 @@ export default async function SongPage() {
 
   // 2. 로그인 유저의 profile (Role, Class) 조회
   const { data: profile } = await supabase
-    .from("profiles")
+    .from("users")
     .select("*")
     .eq("id", user.id)
     .single();
@@ -36,8 +36,7 @@ export default async function SongPage() {
 
   const userInfo = {
     name: profile.name,
-    role: profile.role,
-    classId: profile.class_id
+    role: profile.role
   };
 
   // 4. 실시간 동기화 클라이언트 래퍼로 렌더링

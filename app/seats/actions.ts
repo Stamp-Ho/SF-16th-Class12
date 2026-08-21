@@ -11,15 +11,21 @@ export interface CreateRoundRequest {
   round: number;
   title: string;
   peoplePerGroup: number;
-  isGambleEnabled: boolean;
+  isGambleEnabled?: boolean;
   seatCodes?: string[];
+  initialGroups?: {
+    groupName: string;
+    member_1?: string;
+    member_2?: string;
+    member_3?: string;
+  }[]
 }
 
 export interface GroupRequest {
   groupName: string;
-  member1?: string;
-  member2?: string;
-  member3?: string;
+  member_1?: string;
+  member_2?: string;
+  member_3?: string;
 }
 
 export interface BidRequest {
@@ -37,9 +43,9 @@ export interface GambleRequest {
 
 export interface DetailAssignRequest {
   allocationId: number;
-  memberLeft?: string;
-  memberMiddle?: string;
-  memberRight?: string;
+  memberLeft: string | null;
+  memberMiddle: string | null;
+  memberRight: string | null;
 }
 
 // =================================================================
@@ -53,9 +59,9 @@ export async function getAllRounds() {
   const supabase = await createClient();
 
   const { data, error } = await supabase
-    .from('seat_round')
+    .from('seat_rounds')
     .select('*')
-    .order('round', { ascending: true });
+    .order('round', { ascending: false });
 
   if (error) throw new Error(`라운드 목록 조회 실패: ${error.message}`);
   return data;
@@ -69,12 +75,12 @@ export async function createRound(request: CreateRoundRequest) {
 
   // 1. 라운드 생성
   const { data: roundData, error: roundError } = await supabase
-    .from('seat_round')
+    .from('seat_rounds')
     .insert({
       round: request.round,
       title: request.title,
       people_per_group: request.peoplePerGroup,
-      is_gamble_enabled: request.isGambleEnabled,
+      is_gamble_enabled: request.isGambleEnabled ?? true,
     })
     .select()
     .single();
@@ -82,7 +88,7 @@ export async function createRound(request: CreateRoundRequest) {
   if (roundError) throw new Error(`라운드 생성 실패: ${roundError.message}`);
 
   // 2. 기본 좌석 목록 구성 (입력값이 없으면 A~M)
-  const defaultCodes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'];
+  const defaultCodes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', "가", "나", "다"];
   const seatCodes = request.seatCodes && request.seatCodes.length > 0 ? request.seatCodes : defaultCodes;
 
   const allocationsToInsert = seatCodes.map((code) => ({
@@ -92,11 +98,26 @@ export async function createRound(request: CreateRoundRequest) {
     is_locked: false,
   }));
 
+  const seatGroupsToInsert = request.initialGroups?.map((group) => ({
+    round_id: roundData.id,
+    group_name: group.groupName,
+    member_1: group.member_1 ?? null,
+    member_2: group.member_2 ?? null,
+    member_3: group.member_3 ?? null,
+  })) ?? [];
+
   const { error: allocationError } = await supabase
-    .from('seat_allocation')
+    .from('seat_allocations')
     .insert(allocationsToInsert);
 
   if (allocationError) throw new Error(`좌석 생성 실패: ${allocationError.message}`);
+
+  if (seatGroupsToInsert.length > 0) {
+    const { error: seatGroupError } = await supabase
+      .from('seat_groups')
+      .insert(seatGroupsToInsert);
+    if (seatGroupError) throw new Error(`그룹 생성 실패: ${seatGroupError.message}`);
+  }
 
   revalidatePath('/seats');
   return roundData;
@@ -109,8 +130,8 @@ export async function closeRound(roundId: number) {
   const supabase = await createClient();
 
   const { data, error } = await supabase
-    .from('seat_round')
-    .update({ is_closed: true, updated_at: new Date().toISOString() })
+    .from('seat_rounds')
+    .update({ is_closed: true })
     .eq('id', roundId)
     .select()
     .single();
@@ -127,8 +148,8 @@ export async function openRound(roundId: number) {
   const supabase = await createClient();
 
   const { data, error } = await supabase
-    .from('seat_round')
-    .update({ is_closed: false, updated_at: new Date().toISOString() })
+    .from('seat_rounds')
+    .update({ is_closed: false })
     .eq('id', roundId)
     .select()
     .single();
@@ -145,7 +166,7 @@ export async function deleteRound(roundId: number) {
   const supabase = await createClient();
 
   const { error } = await supabase
-    .from('seat_round')
+    .from('seat_rounds')
     .delete()
     .eq('id', roundId);
 
@@ -165,7 +186,7 @@ export async function getGroupsByRound(roundId: number) {
   const supabase = await createClient();
 
   const { data, error } = await supabase
-    .from('seat_group')
+    .from('seat_groups')
     .select('*')
     .eq('round_id', roundId)
     .order('id', { ascending: true });
@@ -181,13 +202,13 @@ export async function createGroup(roundId: number, request: GroupRequest) {
   const supabase = await createClient();
 
   const { data, error } = await supabase
-    .from('seat_group')
+    .from('seat_groups')
     .insert({
       round_id: roundId,
       group_name: request.groupName,
-      member1: request.member1 ?? null,
-      member2: request.member2 ?? null,
-      member3: request.member3 ?? null,
+      member_1: request.member_1 ?? null,
+      member_2: request.member_2 ?? null,
+      member_3: request.member_3 ?? null,
     })
     .select()
     .single();
@@ -204,17 +225,13 @@ export async function deleteAllocation(allocationId: number) {
   const supabase = await createClient();
 
   const { data, error } = await supabase
-    .from('seat_allocation')
+    .from('seat_allocations')
     .update({
       group_id: null,
-      member1: null,
-      member2: null,
-      member3: null,
       member_left: null,
       member_middle: null,
       member_right: null,
       bid_price: 0,
-      updated_at: new Date().toISOString(),
     })
     .eq('id', allocationId)
     .select()
@@ -236,7 +253,7 @@ export async function getAllocationsByRound(roundId: number) {
   const supabase = await createClient();
 
   const { data, error } = await supabase
-    .from('seat_allocation')
+    .from('seat_allocations')
     .select(`
       *,
       seat_group:group_id (
@@ -255,6 +272,7 @@ export async function getAllocationsByRound(roundId: number) {
  */
 export async function placeBid(request: BidRequest) {
   const supabase = await createClient();
+  console.log(request.nextGroupId);
 
   const { data, error } = await supabase.rpc('place_bid', {
     p_allocation_id: request.allocationId,
@@ -262,6 +280,7 @@ export async function placeBid(request: BidRequest) {
     p_user_name: request.userName,
     p_price_change: request.priceChange,
   });
+
 
   if (error) throw new Error(`입찰 실패: ${error.message}`);
   revalidatePath('/seats');
@@ -292,12 +311,11 @@ export async function assignDetailedSeat(request: DetailAssignRequest) {
   const supabase = await createClient();
 
   const { data, error } = await supabase
-    .from('seat_allocation')
+    .from('seat_allocations')
     .update({
       member_left: request.memberLeft ?? null,
       member_middle: request.memberMiddle ?? null,
       member_right: request.memberRight ?? null,
-      updated_at: new Date().toISOString(),
     })
     .eq('id', request.allocationId)
     .select()
@@ -316,7 +334,7 @@ export async function toggleLockSeat(allocationId: number) {
 
   // 1. 현재 락 상태 조회
   const { data: current, error: fetchError } = await supabase
-    .from('seat_allocation')
+    .from('seat_allocations')
     .select('is_locked')
     .eq('id', allocationId)
     .single();
@@ -327,10 +345,9 @@ export async function toggleLockSeat(allocationId: number) {
 
   // 2. 상태 반전 업데이트
   const { data, error: updateError } = await supabase
-    .from('seat_allocation')
+    .from('seat_allocations')
     .update({
       is_locked: !current.is_locked,
-      updated_at: new Date().toISOString(),
     })
     .eq('id', allocationId)
     .select()
@@ -352,7 +369,7 @@ export async function getHistoriesByRound(roundId: number) {
   const supabase = await createClient();
 
   const { data, error } = await supabase
-    .from('seat_bid_history')
+    .from('seat_bid_histories')
     .select('*')
     .eq('round_id', roundId)
     .order('created_at', { ascending: false });

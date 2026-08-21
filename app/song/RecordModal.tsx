@@ -5,18 +5,16 @@ import { getSongRecords } from "./actions";
 import { CheckCircle2, Music2, XCircle, X } from "lucide-react";
 
 export default function RecordModal({
-  onClose,
-  classId
+  onClose
 }: {
   onClose: () => void;
-  classId: string;
 }) {
   const [records, setRecords] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchSingerList = async () => {
       try {
-        const data = await getSongRecords(classId);
+        const data = await getSongRecords();
         setRecords(
           (data ?? [])
             .filter(
@@ -36,7 +34,7 @@ export default function RecordModal({
       }
     };
     fetchSingerList();
-  }, [classId]);
+  }, []);
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createRound } from "./actions";
+import { createNewSeatRound, type SeatRound } from "./actions";
 import {
   Loader2,
   ChevronLeft,
@@ -10,8 +10,7 @@ import {
   RotateCcw,
   Edit3,
   Trash2,
-  GripVertical,
-  Users
+  GripVertical
 } from "lucide-react";
 import { LayoutGroup, motion } from "framer-motion";
 import ImportShuffleModal from "./ImportShuffleMdoal"; 
@@ -20,16 +19,19 @@ import { getTargetUsers } from "../shuffle/actions";
 
 interface AllocationAddModalProps {
   onClose: () => void;
-  rounds: any[];
+  rounds: SeatRound[];
   loadData: () => Promise<void>;
 }
 
-// 조 배치 표시용 슬롯 (flatIndex: 원본 flatMembers에서의 위치, 파생 슬롯이면 -1)
-interface GroupSlot {
-  name: string;
-  status: boolean;
-  flatIndex: number;
-}
+// const ringOrder = [
+//   0, 2, 4, 1, 6, 3, 8, 5, 10, 7, 12, 9, 14, 11, 16, 13, 18, 15, 20, 17, 22, 19,
+//   24, 21, 25, 23
+// ];
+
+// const reverseRingOrder = [
+//   0, 3, 1, 5, 2, 7, 4, 9, 6, 11, 8, 13, 10, 15, 12, 17, 14, 19, 16, 21, 18, 23,
+//   20, 25, 22, 24
+// ];
 
 const dateList = [
   "07.20 ~ 07.31",
@@ -49,7 +51,7 @@ const dateList = [
 export default function AllocationAddModal({
   onClose,
   rounds,
-  loadData,
+  loadData
 }: AllocationAddModalProps) {
   const initialNextRound = rounds.length + 1;
   const [targetRound, setTargetRound] = useState<number>(initialNextRound);
@@ -59,8 +61,6 @@ export default function AllocationAddModal({
   const [isCreating, setIsCreating] = useState(false);
   const [isLoadingLast, setIsLoadingLast] = useState(false);
 
-  const [numberPerGroup, setNumberPerGroup] = useState<number>(2); // 그룹당 인원 수
-
   const [firstOrder, setFirstOrder] = useState<string[]>([]); // 첫 회차 순서 저장
   // 💡 1차원 배정 배열 관리 (커스텀 드래그/삭제용)
   const [flatMembers, setFlatMembers] = useState<
@@ -69,20 +69,20 @@ export default function AllocationAddModal({
 
   useEffect(() => {
     const getProfiles = async () => {
-      const users = await getTargetUsers();
-      if (users.length % 2 == 1)
-        users.push({ username: "빈자리", id: null, role: "user" });
+      const profiles = await getTargetUsers();
+      if (profiles.length % 2 == 1)
+        profiles.push({ name: "빈자리", id: "empty", role: "user" });
       setFlatMembers(
-        users.map((p) => ({
-          name: p.username,
-          status: p.username == "빈자리" ? false : true
+        profiles.map((p) => ({
+          name: p.name,
+          status: p.name == "빈자리" ? false : true
         }))
       );
-      setFirstOrder(users.map((p) => p?.username));
+      setFirstOrder(profiles.map((p) => p?.name));
 
-      setRingOrder(generateRingOrder(users.length));
-      console.log(generateRingOrder(users.length));
-      setReverseRingOrder(generateReverseRingOrder(users.length));
+      setRingOrder(generateRingOrder(profiles.length));
+      console.log(generateRingOrder(profiles.length));
+      setReverseRingOrder(generateReverseRingOrder(profiles.length));
     };
     getProfiles();
   }, []);
@@ -185,19 +185,18 @@ export default function AllocationAddModal({
   const handleLoadLastRoundFromDB = async () => {
     setIsLoadingLast(true);
     try {
-      const latestRound = [...rounds].sort(
-        (left, right) => right.roundNumber - left.roundNumber
-      )[0];
-
-      if (!latestRound?.groups?.length) {
+      if (rounds.length === 0) {
         alert("저장된 지난 회차 배정 데이터가 없습니다.");
         return;
       }
-      const latestRoundSeats = latestRound.groups.reduce(
-        (members: string[], group: { m1?: string; m2?: string }) => {
-          if (group.m1) members.push(group.m1);
-          if (group.m2) members.push(group.m2);
-          return members;
+      const latestRound = [...rounds].sort((a, b) => b.roundNumber - a.roundNumber)[0];
+      const latestRoundNum = latestRound.roundNumber;
+      const latestRoundSeats = latestRound.groups.reduce<string[]>(
+  		(acc, group) => {
+          if (group.m1) acc.push(group.m1);
+          if (group.m2) acc.push(group.m2);
+					if (group.m3) acc.push(group.m3);
+          return acc;
         },
         [] as string[]
       );
@@ -211,14 +210,14 @@ export default function AllocationAddModal({
           }))
         );
         setIsCustomMode(true); // 불러온 후 커스텀 모드로 전환
-        setTargetRound(latestRound.roundNumber);
+        setTargetRound(latestRoundNum);
         setRoundTitle(
-          `${latestRound.roundNumber}회차 (${dateList[latestRound.roundNumber - 1] || "2주 배정"})`
+          `${latestRoundNum}회차 (${dateList[latestRoundNum - 1] || "2주 배정"})`
         );
-        alert(`최신(${latestRound.roundNumber}회차) 데이터를 성공적으로 불러왔습니다!`);
+        alert(`최신(${latestRoundNum}회차) 데이터를 성공적으로 불러왔습니다!`);
       }
-    } catch (err: any) {
-      alert(`불러오기 실패: ${err.message}`);
+    } catch (error) {
+      alert(`불러오기 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`);
     } finally {
       setIsLoadingLast(false);
     }
@@ -257,37 +256,17 @@ export default function AllocationAddModal({
     setDraggedIndex(null);
   };
 
-  // 2인 짝 리스트로 변환 (원본 flatMembers 인덱스를 함께 추적)
-  const flatPairs: GroupSlot[][] = [];
+  // 2차원 짝 리스트로 변환
+  const currentPairs: [
+    { name: string; status: boolean },
+    { name: string; status: boolean }
+  ][] = [];
   for (let i = 0; i < flatMembers.length; i += 2) {
-    const m1 = flatMembers[i];
-    const m2 = flatMembers[i + 1];
-    flatPairs.push([
-      m1 ? { ...m1, flatIndex: i } : { name: "빈자리", status: false, flatIndex: -1 },
-      m2 ? { ...m2, flatIndex: i + 1 } : { name: "빈자리", status: false, flatIndex: -1 }
+    currentPairs.push([
+      flatMembers[i] || { name: "빈자리", status: false },
+      flatMembers[i + 1] || { name: "빈자리", status: false }
     ]);
   }
-
-  // 3인 배치: 앞쪽 조는 기존 2인조를 그대로 유지하고, 나머지 인원을 순서대로 3번째 자리에 채움
-  // ex) 1,2 / 3,4 / 5,6 / 7,8 / 9 -> 1,2,7 / 3,4,8 / 5,6,9
-  const currentGroups: GroupSlot[][] =
-    numberPerGroup === 3
-      ? (() => {
-          const realCount = flatMembers.filter((m) => m.status).length;
-          const groupCount = Math.max(1, Math.ceil(realCount / 3));
-          const seed = flatPairs.slice(0, groupCount);
-          const leftover = flatPairs
-            .slice(groupCount)
-            .flat()
-            .filter((slot) => slot.status);
-
-          return seed.map((pair, i) => [
-            pair[0],
-            pair[1],
-            leftover[i] || { name: "빈자리", status: false, flatIndex: -1 }
-          ]);
-        })()
-      : flatPairs;
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -295,24 +274,11 @@ export default function AllocationAddModal({
 
     setIsCreating(true);
     try {
-      await createRound({
-        round: targetRound,
-        title: roundTitle,
-        peoplePerGroup: numberPerGroup,
-        isGambleEnabled: true,
-        initialGroups: currentGroups
-          .filter((group) => group.some((member) => member.status))
-          .map((group, index) => ({
-            groupName:
-              group
-                .filter((member) => member.status)
-                .map((member) => member.name)
-                .join(", ") || `${index + 1}조`,
-            member_1: group[0]?.status ? group[0].name : undefined,
-            member_2: group[1]?.status ? group[1].name : undefined,
-            member_3: group[2]?.status ? group[2].name : undefined
-          })),
-      });
+      const result = await createNewSeatRound(
+        targetRound,
+        roundTitle,
+        flatMembers.map((m) => (m.status ? m.name : "")),
+      );
 
       onClose();
       await loadData();
@@ -364,23 +330,6 @@ export default function AllocationAddModal({
               <span>직전 회차 불러오기</span>
             </button>
 
-            {/* 인원수 배치 토글 버튼 (2인 <-> 3인) */}
-            <button
-              type="button"
-              onClick={() =>
-                setNumberPerGroup((prev) => (prev === 3 ? 2 : 3))
-              }
-              className={`flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors ${
-                numberPerGroup === 3
-                  ? "bg-indigo-600 text-white border-indigo-600"
-                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-              }`}
-              title="3인 배치로 전환 시, 기존 2인조를 최대한 유지하며 세 번째 인원을 채웁니다."
-            >
-              <Users className="w-3.5 h-3.5" />
-              <span>{numberPerGroup === 3 ? "2인 배치로 전환" : "3인 배치로 전환"}</span>
-            </button>
-
             {/* 커스텀 토글 버튼 */}
             <button
               type="button"
@@ -412,18 +361,12 @@ export default function AllocationAddModal({
                 <button
                   type="button"
                   onClick={() => handleRotateRight(false)}
-                  disabled={
-                    numberPerGroup === 3 ||
-                    targetRound <= 1 ||
-                    initialNextRound >= targetRound
-                  }
+                  disabled={targetRound <= 1 || initialNextRound >= targetRound}
                   className="p-2.5 text-slate-600 hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                   title={
-                    numberPerGroup === 3
-                      ? "3인 배치에서는 링 회전을 사용할 수 없습니다."
-                      : isCustomMode
-                        ? "커스텀 모드에서는 이전 회차로 이동할 수 없습니다."
-                        : ""
+                    isCustomMode
+                      ? "커스텀 모드에서는 이전 회차로 이동할 수 없습니다."
+                      : ""
                   }
                 >
                   <ChevronLeft className="w-4 h-4" />
@@ -448,17 +391,12 @@ export default function AllocationAddModal({
                 <button
                   type="button"
                   onClick={() => handleRotateRight(true)}
-                  disabled={
-                    numberPerGroup === 3 ||
-                    (isCustomMode && targetRound >= initialNextRound + 1)
-                  }
+                  disabled={isCustomMode && targetRound >= initialNextRound + 1}
                   className="p-2.5 text-slate-600 hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                   title={
-                    numberPerGroup === 3
-                      ? "3인 배치에서는 링 회전을 사용할 수 없습니다."
-                      : isCustomMode && targetRound >= initialNextRound + 1
-                        ? "커스텀 모드에서는 다음 회차로 1회만 이동 가능합니다."
-                        : ""
+                    isCustomMode && targetRound >= initialNextRound + 1
+                      ? "커스텀 모드에서는 다음 회차로 1회만 이동 가능합니다."
+                      : ""
                   }
                 >
                   <ChevronRight className="w-4 h-4" />
@@ -480,91 +418,89 @@ export default function AllocationAddModal({
             </div>
           </div>
 
-          {/* N컬럼 리스트 (2인/3인 배치, 드래그 & 삭제 커스텀 지원) */}
+          {/* 3컬럼 리스트 (드래그 & 삭제 커스텀 지원) */}
           <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-100 flex-1 flex flex-col min-h-0">
             {/* 헤더 */}
-            <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400 pb-2 border-b border-slate-200/60 px-2 text-center">
-              <div className="w-14 shrink-0 flex items-center justify-center gap-1">
+            <div className="grid grid-cols-12 text-[11px] font-bold text-slate-400 pb-2 border-b border-slate-200/60 px-2 text-center">
+              <div className="col-span-2 flex items-center justify-center gap-1">
                 <Hash className="w-3 h-3" /> 조
               </div>
-              <div
-                className="flex-1 grid gap-2"
-                style={{
-                  gridTemplateColumns: `repeat(${numberPerGroup}, minmax(0, 1fr))`
-                }}
-              >
-                {["첫 번째 사람 (A)", "두 번째 사람 (B)", "세 번째 사람 (C)"]
-                  .slice(0, numberPerGroup)
-                  .map((label) => (
-                    <div key={label}>{label}</div>
-                  ))}
-              </div>
+              <div className="col-span-5">첫 번째 사람 (A)</div>
+              <div className="col-span-5">두 번째 사람 (B)</div>
             </div>
 
             <div className="flex-1 overflow-y-auto pr-1 pt-1 space-y-1.5">
               <LayoutGroup id="seat-allocation-group">
-                {currentGroups.map((group, groupIdx) => (
-                  <div
-                    key={`group-row-${groupIdx}`}
-                    className="flex items-center gap-2 text-xs py-0.5 px-1"
-                  >
-                    {/* 조 이름 */}
-                    <div className="w-14 shrink-0 text-center">
-                      <span className="font-mono text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full inline-block">
-                        {groupIdx + 1}조
-                      </span>
-                    </div>
+                {currentPairs.map(([p1, p2], pairIdx) => {
+                  const idx1 = pairIdx * 2;
+                  const idx2 = pairIdx * 2 + 1;
 
-                    {/* 조원 셀 */}
+                  return (
                     <div
-                      className="flex-1 grid gap-2"
-                      style={{
-                        gridTemplateColumns: `repeat(${numberPerGroup}, minmax(0, 1fr))`
-                      }}
+                      key={`pair-row-${pairIdx}`}
+                      className="grid grid-cols-12 items-center text-xs gap-2 py-0.5 px-1"
                     >
-                      {group.map((member, memberIdx) => {
-                        const canEdit = isCustomMode && member.flatIndex >= 0;
-                        return (
-                          <div
-                            key={`member-${groupIdx}-${memberIdx}`}
-                            className="flex items-center gap-1 relative group"
-                            draggable={canEdit}
-                            onDragStart={(e) =>
-                              handleDragStart(e, member.flatIndex)
-                            }
-                            onDragOver={handleDragOver}
-                            onDrop={() => handleDrop(member.flatIndex)}
-                          >
-                            {isCustomMode && (
-                              <GripVertical
-                                className={`w-3.5 h-3.5 shrink-0 ${
-                                  canEdit
-                                    ? "text-slate-300 cursor-grab active:cursor-grabbing"
-                                    : "text-transparent"
-                                }`}
-                              />
-                            )}
-                            <div className="flex-1 relative">
-                              <NameCard name={member.name} status={member.status} />
-                              {canEdit && member.status && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleRemoveMember(member.flatIndex)
-                                  }
-                                  className="absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                                  title="삭제"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
+                      {/* 1컬럼: 조 이름 */}
+                      <div className="col-span-2 text-center">
+                        <span className="font-mono text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full inline-block">
+                          {pairIdx + 1}조
+                        </span>
+                      </div>
+
+                      {/* 2컬럼: 첫 번째 사람 셀 */}
+                      <div
+                        className="col-span-5 flex items-center gap-1 relative group"
+                        draggable={isCustomMode}
+                        onDragStart={(e) => handleDragStart(e, idx1)}
+                        onDragOver={handleDragOver}
+                        onDrop={() => handleDrop(idx1)}
+                      >
+                        {isCustomMode && (
+                          <GripVertical className="w-3.5 h-3.5 text-slate-300 cursor-grab active:cursor-grabbing shrink-0" />
+                        )}
+                        <div className="flex-1 relative">
+                          <NameCard name={p1.name} status={p1.status} />
+                          {isCustomMode && p1.status && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveMember(idx1)}
+                              className="absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                              title="삭제"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 3컬럼: 두 번째 사람 셀 */}
+                      <div
+                        className="col-span-5 flex items-center gap-1 relative group"
+                        draggable={isCustomMode}
+                        onDragStart={(e) => handleDragStart(e, idx2)}
+                        onDragOver={handleDragOver}
+                        onDrop={() => handleDrop(idx2)}
+                      >
+                        {isCustomMode && (
+                          <GripVertical className="w-3.5 h-3.5 text-slate-300 cursor-grab active:cursor-grabbing shrink-0" />
+                        )}
+                        <div className="flex-1 relative">
+                          <NameCard name={p2.name} status={p2.status} />
+                          {isCustomMode && p2.status && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveMember(idx2)}
+                              className="absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                              title="삭제"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </LayoutGroup>
             </div>
           </div>
@@ -591,7 +527,7 @@ export default function AllocationAddModal({
         {isSelectShuffleModalOpen && (
           <ImportShuffleModal
             setDrawHistory={setDrawHistory}
-            onClose={() => setIsSelectShuffleModalOpen(false)} 
+            onClose={() => setIsSelectShuffleModalOpen(false)}
           />
         )}
       </div>

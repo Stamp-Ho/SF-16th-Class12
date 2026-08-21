@@ -26,7 +26,7 @@ export const getCurrentUser = cache(async () => {
   const { data: profile } = await supabase
     .from('users')
     .select('*')
-    .eq('id', user.id) // 또는 name/auth_user_id 매핑 컬럼
+    .eq('username', user.user_metadata.name) // 또는 name/auth_user_id 매핑 컬럼
     .single();
 
   return {
@@ -42,7 +42,7 @@ export const requireAuth = cache(async () => {
   const { user, profile } = await getCurrentUser();
 
   if (!user) return { status: 'UNAUTHENTICATED' as const, user: null, profile: null };
-  if (!profile || !profile.class_id) return { status: 'FORBIDDEN' as const, user, profile };
+  if (!profile) return { status: 'FORBIDDEN' as const, user, profile };
 
   return { status: 'AUTHORIZED' as const, user, profile };
 });

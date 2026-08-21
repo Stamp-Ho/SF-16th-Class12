@@ -17,7 +17,7 @@ const RandomSelectModal = dynamic(() => import('./RandomSelectModal'), {
 export default function SongMain({
 	user,
 }: {
-	user: { name: string; role: string; classId: string };
+	user: { name: string; role: string};
 }) {
 	const supabase = useMemo(() => createClient(), []);
 	const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
@@ -34,7 +34,7 @@ export default function SongMain({
 
 	const fetchSingerList = async () => {
 		try {
-			const data = await getSongRecords(user.classId);
+			const data = await getSongRecords();
 			setSingerList(
 				data
 					.filter((record) => record.status === 'pending')
@@ -51,10 +51,9 @@ export default function SongMain({
 	};
 	useEffect(() => {
 		fetchSingerList();
-	}, [user.classId]);
+	}, []);
 
 	useEffect(() => {
-		if (!user.classId) return;
 		fetchSingerList(); // 초기 로드 시 한 번 호출
 		const channel = supabase
 			.channel(`song_records`)
@@ -69,15 +68,13 @@ export default function SongMain({
 		return () => {
 			supabase.removeChannel(channel);
 		};
-	}, [user.classId]);
+	}, []);
 
 	const onSubmitAddSinger = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (!newSingerName.trim()) return;
 		try {
 			await addSongRecord(
-				user.classId,
-
 				newSingerName,
 				newSingerReason,
 				addFront,
@@ -294,12 +291,10 @@ export default function SongMain({
 				{isRecordModalOpen && (
 					<RecordModal
 						onClose={() => setIsRecordModalOpen(false)}
-						classId={user.classId}
 					/>
 				)}
 				{isRandomSelectModalOpen && (
 					<RandomSelectModal
-						classId={user.classId}
 						setSingerName={setNewSingerName}
 						setSingerReason={setNewSingerReason}
 						onClose={() => setIsRandomSelectModalOpen(false)}

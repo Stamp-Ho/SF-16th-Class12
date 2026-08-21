@@ -26,7 +26,7 @@ export default function StagePage({
 	user,
 }: {
 	stageData: any;
-	user: { name: string; role: string; classId: string };
+	user: { name: string; role: string };
 }) {
 	const supabase = useMemo(() => createClient(), []);
 	const chatListRef = useRef<HTMLDivElement | null>(null);
@@ -88,7 +88,7 @@ export default function StagePage({
 
 	const handleFinishSong = async () => {
 		try {
-			await completeSongRecord(stageData.id, user.classId);
+			await completeSongRecord(stageData.id);
 		} catch (err) {
 			console.error('노래 종료 실패:', err);
 		}

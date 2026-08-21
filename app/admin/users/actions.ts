@@ -11,7 +11,6 @@ function getVirtualEmail(name: string) {
 // 1. Comma-separated 회원 일괄 등록
 export async function bulkRegisterUsers(
   commaSeparatedNames: string,
-  className: string,
 ) {
   // 💡 세션을 변경하지 않는 Admin 전용 클라이언트 사용
   const supabaseAdmin = createAdminClient();
@@ -24,14 +23,14 @@ export async function bulkRegisterUsers(
   const results = { successCount: 0, failCount: 0, errors: [] as string[] };
 
   for (const name of names) {
-    const virtualEmail = getVirtualEmail(className + name);
+    const virtualEmail = getVirtualEmail(name);
 
     // signUp 대신 admin.createUser 사용
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email: virtualEmail,
       password: "ssafy16",
       email_confirm: true, // 이메일 인증 완료 상태로 설정 (메일 미발송)
-      user_metadata: { name, email: virtualEmail } // Supabase Trigger(handle_new_user)로 profiles에 name 자동 삽입
+      user_metadata: { name, email: virtualEmail } // Supabase Trigger(handle_new_user)로 users에 name 자동 삽입
     });
     console.log(data, error);
 
@@ -39,9 +38,9 @@ export async function bulkRegisterUsers(
       results.failCount++;
       results.errors.push(`${name}: ${error?.message ?? "Unknown error"}`);
     } else {
-      // 2. 트리거로 생성된 profiles 레코드에 email 수동 업데이트
+      // 2. 트리거로 생성된 users 레코드에 email 수동 업데이트
       await supabaseAdmin
-        .from("profiles")
+        .from("users")
         .update({ email: virtualEmail})
         .eq("id", data.user.id);
       results.successCount++;
@@ -56,9 +55,9 @@ export async function getAllUsers() {
 
   // 1. 공통 기본 쿼리 작성 (전체 조회 기준)
   let query = supabase
-    .from("profiles")
-    .select("id, name, email, role, status, created_at, class_id")
-    .order("name", { ascending: true });
+    .from("users")
+    .select("username, role, status, id")
+    .order("username", { ascending: true });
  
 
   // 3. 쿼리 실행
@@ -72,16 +71,16 @@ export async function getAllUsers() {
 }
 // 2. 유저 권한 및 상태 변경 (Admin 전용)
 export async function updateUserStatus(
-  userId: string,
-  role: "class_admin" | "user" | "song_admin",
-  status: "active" | "blocked"
+  userName: string,
+  role: "class_admin" | "user" | "song_admin" | "teacher",
+  status: "ACTIVE" | "INACTIVE"
 ) {
   const supabaseAdmin = createAdminClient();
 
   const { error } = await supabaseAdmin
-    .from("profiles")
+    .from("users")
     .update({ role, status })
-    .eq("id", userId);
+    .eq("username", userName);
 
   if (error) {
     throw new Error(`상태 업데이트 실패: ${error.message}`);
@@ -91,15 +90,29 @@ export async function updateUserStatus(
   return { success: true };
 }
 
-export async function resetUserPassword(userId: string, newPassword: string) {
+export async function resetUserPassword(username: string, newPassword: string) {
   if (!newPassword || newPassword.length < 6) {
     throw new Error("비밀번호는 최소 6자리 이상이어야 합니다.");
   }
 
-  // Supabase Auth Admin API로 해당 유저의 비밀번호 변경
   const supabaseAdmin = createAdminClient();
+  const { data: authUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000,
+  });
+
+  if (listError) {
+    throw new Error(`Auth 사용자 조회 실패: ${listError.message}`);
+  }
+
+  const authUser = authUsers.users.find((user) => user.user_metadata.name === username);
+
+  if (!authUser) {
+    throw new Error(`${username}에 연결된 Auth 사용자를 찾을 수 없습니다.`);
+  }
+
   const { data, error } = await supabaseAdmin.auth.admin.updateUserById(
-    userId,
+    authUser.id,
     { password: newPassword }
   );
 

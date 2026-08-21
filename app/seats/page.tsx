@@ -1,4 +1,3 @@
-import { createClient } from "@/utils/supabase/server";
 import LoginModal from "@/app/(auth)/LoginModal";
 
 import SeatsMain from "./SeatsMain";
@@ -9,5 +8,5 @@ export default async function SeatAuctionPage() {
 
   if (status === 'UNAUTHENTICATED') return <LoginModal />;
   if (status === 'FORBIDDEN') return <div className="text-center text-red-500">권한이 없습니다.</div>;
-  return <SeatsMain />;
+  return <SeatsMain profile={{name: profile.username, role: profile.role}} />;
 }

@@ -7,14 +7,15 @@ import { revalidatePath } from "next/cache";
 export async function getTargetUsers() {
   const supabase = await createClient();
 
-  const { data: profiles, error } = await supabase
-    .from("profiles")
-    .select("id, name, role")
-    .eq("status", "active")
-    .order("name", { ascending: true });
+  const { data: users, error } = await supabase
+    .from("users")
+    .select("id, username, role")
+    .eq("status", "ACTIVE")
+    .order("username", { ascending: true });
+  console.log(users);
 
   if (error) throw new Error(`유저 목록 조회 실패: ${error.message}`);
-  return profiles.filter(profile => profile.role !== "teacher");
+  return users.filter(profile => profile.role !== "teacher");
 }
 
 // 2. 추첨 결과 DB 저장 (JSONB 통째 저장)
@@ -58,7 +59,7 @@ export async function getRandomDrawHistory() {
       description,
       result_data,
       created_at,
-      creator:profiles!random_draws_created_by_fkey(name)
+      creator:users!random_draws_created_by_fkey(username)
     `
     )
     .order("created_at", { ascending: false });

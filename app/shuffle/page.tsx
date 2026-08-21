@@ -14,7 +14,7 @@ export default async function RandomizerPage() {
   }
   // 2. 로그인 유저의 profile (Role) 조회
   const { data: profile } = await supabase
-    .from("profiles")
+    .from("users")
     .select("*")
     .eq("id", user.id)
     .single();
@@ -22,5 +22,5 @@ export default async function RandomizerPage() {
     return <div className="text-center text-red-500">권한이 없습니다.</div>;
   }
 
-  return <ShuffleMain classId={profile?.class_id || ""} />;
+  return <ShuffleMain />;
 }
