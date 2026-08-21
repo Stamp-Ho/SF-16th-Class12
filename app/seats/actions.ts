@@ -267,6 +267,39 @@ export async function getAllocationsByRound(roundId: number) {
   return data;
 }
 
+export async function getSeatsDataByRounds(roundIds: number[]) {
+  if (!roundIds.length) return { groups: [], allocations: [] };
+
+  const supabase = await createClient();
+
+  // 단 2번의 DB 쿼리를 병렬 실행
+  const [groupsRes, allocationsRes] = await Promise.all([
+    supabase
+      .from('seat_groups')
+      .select('*')
+      .in('round_id', roundIds)
+      .order('id', { ascending: true }),
+
+    supabase
+      .from('seat_allocations')
+      .select(`
+        *,
+        seat_group:group_id (
+          group_name
+        )
+      `)
+      .in('round_id', roundIds)
+      .order('seat_code', { ascending: true })
+  ]);
+
+  if (groupsRes.error) throw new Error(`그룹 목록 조회 실패: ${groupsRes.error.message}`);
+  if (allocationsRes.error) throw new Error(`좌석 배정 현황 조회 실패: ${allocationsRes.error.message}`);
+
+  return {
+    groups: groupsRes.data,
+    allocations: allocationsRes.data
+  };
+}
 /**
  * 일반 입찰 (RPC 호출)
  */

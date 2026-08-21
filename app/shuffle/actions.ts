@@ -15,7 +15,11 @@ export async function getTargetUsers() {
   console.log(users);
 
   if (error) throw new Error(`유저 목록 조회 실패: ${error.message}`);
-  return users.filter(profile => profile.role !== "teacher");
+  return users.filter(profile => profile.role !== "teacher").map(profile => ({
+    id: profile.id,
+    name: profile.username,
+    role: profile.role,
+  }));
 }
 
 // 2. 추첨 결과 DB 저장 (JSONB 통째 저장)
@@ -37,7 +41,6 @@ export async function saveRandomDraw(
     title: title.trim(),
     description: description.trim(),
     result_data: resultData, // JSONB 객체 배열 저장
-    created_by: user.id,
   });
 
   if (error) throw new Error(`저장 실패: ${error.message}`);

@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { getAllRounds, getAllocationsByRound, getGroupsByRound } from './actions';
+import { getAllRounds, getAllocationsByRound, getGroupsByRound, getSeatsDataByRounds } from './actions';
 import ClassroomGrid from './ClassroomGrid';
 import { createClient } from '@/utils/supabase/client';
 import {
@@ -46,57 +46,80 @@ export default function SeatsMain({ profile }: { profile: any }) {
 	const loadData = useCallback(async () => {
 		try {
 			const roundData = await getAllRounds();
-			const data = await Promise.all(
-				roundData.map(async (round) => {
-					const [groups, allocations] = await Promise.all([
-						getGroupsByRound(round.id),
-						getAllocationsByRound(round.id),
-					]);
+			if (!roundData || roundData.length === 0) {
+				setRounds([]);
+				setSelectedRound(null);
+				return;
+			}
 
-					return {
-						...round,
-						roundNumber: round.id,
-						numberPerGroup: round.people_per_group,
-						isClosed: round.is_closed,
-						groups: groups.map((group) => ({
-							...group,
-							groupId: String(group.id),
-							m1: group.member_1,
-							m2: group.member_2,
-							m3: group.member_3,
-							groupName: group.group_name,
-						})),
-						seats: allocations.map((allocation) => ({
-							...allocation,
-							id: String(allocation.id),
-							current_group_id: allocation.group_id ? String(allocation.group_id) : null,
-							current_group_name: allocation.seat_group?.group_name ?? null,
-							current_bid_price: allocation.bid_price,
-							locked: allocation.is_locked,
-							member_left: allocation.member_left ?? allocation.seat_group?.member_1 ?? null,
-							member_middle: allocation.member_middle ?? allocation.seat_group?.member_2 ?? null,
-							member_right: allocation.member_right ?? allocation.seat_group?.member_3 ?? null,
-						})),
-					};
-				}),
-			);
+			// 1. 전체 라운드 ID 목록으로 그룹 및 좌석 배정 데이터를 한 번에 가져옴 (단 1회 네트워크 요청)
+			const roundIds = roundData.map((r) => r.id);
+			const { groups: allGroups, allocations: allAllocations } = await getSeatsDataByRounds(roundIds);
+
+			// 2. round_id 기준으로 빠른 매핑을 위한 그룹핑 (Map 활용)
+			const groupsMap = new Map<number, typeof allGroups>();
+			for (const group of allGroups) {
+				const list = groupsMap.get(group.round_id) || [];
+				list.push(group);
+				groupsMap.set(group.round_id, list);
+			}
+
+			const allocationsMap = new Map<number, typeof allAllocations>();
+			for (const allocation of allAllocations) {
+				const list = allocationsMap.get(allocation.round_id) || [];
+				list.push(allocation);
+				allocationsMap.set(allocation.round_id, list);
+			}
+
+			// 3. 인메모리에서 데이터 조립 (비동기 병목 제거)
+			const data = roundData.map((round) => {
+				const groups = groupsMap.get(round.id) || [];
+				const allocations = allocationsMap.get(round.id) || [];
+
+				return {
+				...round,
+				roundNumber: round.id,
+				numberPerGroup: round.people_per_group,
+				isClosed: round.is_closed,
+				groups: groups.map((group) => ({
+					...group,
+					groupId: String(group.id),
+					m1: group.member_1,
+					m2: group.member_2,
+					m3: group.member_3,
+					groupName: group.group_name,
+				})),
+				seats: allocations.map((allocation) => ({
+					...allocation,
+					id: String(allocation.id),
+					current_group_id: allocation.group_id ? String(allocation.group_id) : null,
+					current_group_name: allocation.seat_group?.group_name ?? null,
+					current_bid_price: allocation.bid_price,
+					locked: allocation.is_locked,
+					member_left: allocation.member_left ?? allocation.seat_group?.member_1 ?? null,
+					member_middle: allocation.member_middle ?? allocation.seat_group?.member_2 ?? null,
+					member_right: allocation.member_right ?? allocation.seat_group?.member_3 ?? null,
+				})),
+				};
+			});
+
 			setRounds(data);
 
 			setSelectedRound((prevSelected: any) => {
 				if (data.length === 0) return null;
 
 				if (prevSelected) {
-					const matchedRound = data.find(
-						(r) => r.roundNumber === prevSelected.roundNumber,
-					);
-					return matchedRound || data[0];
+				const matchedRound = data.find(
+					(r) => r.roundNumber === prevSelected.roundNumber
+				);
+				return matchedRound || data[0];
 				}
 
 				return data[0];
 			});
-		} catch (err) {
+			} catch (err) {
 			console.error('데이터 로드 에러:', err);
-		}
+			}
 	}, []);
 
 	useEffect(() => {

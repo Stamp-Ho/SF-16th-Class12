@@ -14,7 +14,6 @@ import {
   Users
 } from "lucide-react";
 import { LayoutGroup, motion } from "framer-motion";
-import ImportShuffleModal from "./ImportShuffleMdoal"; 
 import { generateRingOrder, generateReverseRingOrder } from "./utils/order";
 import { getTargetUsers } from "../shuffle/actions";
 
@@ -71,14 +70,14 @@ export default function AllocationAddModal({
     const getProfiles = async () => {
       const users = await getTargetUsers();
       if (users.length % 2 == 1)
-        users.push({ username: "빈자리", id: null, role: "user" });
+        users.push({ name: "빈자리", id: null, role: "user" });
       setFlatMembers(
         users.map((p) => ({
-          name: p.username,
-          status: p.username == "빈자리" ? false : true
+          name: p.name,
+          status: p.name == "빈자리" ? false : true
         }))
       );
-      setFirstOrder(users.map((p) => p?.username));
+      setFirstOrder(users.map((p) => p?.name));
 
       setRingOrder(generateRingOrder(users.length));
       console.log(generateRingOrder(users.length));
@@ -339,15 +338,6 @@ export default function AllocationAddModal({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {/* 추첨 이력 불러오기 버튼 */}
-            <button
-              type="button"
-              onClick={() => setIsSelectShuffleModalOpen(true)}
-              className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition-colors"
-              title="이전 추첨 이력 불러오기"
-            >
-              <span>추첨 이력 불러오기</span>
-            </button>
             {/* 마지막 회차 불러오기 버튼 */}
             <button
               type="button"
@@ -588,12 +578,6 @@ export default function AllocationAddModal({
             </button>
           </div>
         </form>
-        {isSelectShuffleModalOpen && (
-          <ImportShuffleModal
-            setDrawHistory={setDrawHistory}
-            onClose={() => setIsSelectShuffleModalOpen(false)} 
-          />
-        )}
       </div>
     </div>
   );

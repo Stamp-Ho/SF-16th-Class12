@@ -40,7 +40,7 @@ export default function SongMain({
 					.filter((record) => record.status === 'pending')
 					.map((record) => ({
 						id: record.id,
-						name: record.name,
+						name: record.user_name,
 						reason: record.reason,
 					})),
 			);
