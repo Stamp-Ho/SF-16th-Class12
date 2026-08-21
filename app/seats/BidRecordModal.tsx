@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Coins, History, Loader2, Skull, Sword, X } from "lucide-react";
+import { Coins, Crown, History, Loader2, Skull, Sword, X } from "lucide-react";
 import { getHistoriesByRound } from "./actions";
 
 type BidHistoryRecord = {
@@ -34,6 +34,12 @@ function formatTime(value: string) {
     return `${hh}:${mm}:${ss}`;
 }
 
+type RankingData = {
+    user_name: string;
+    bid_count: number;
+    success_count: number;
+    fail_count: number;
+};
 export default function BidRecordModal({
 	roundId,
 	onClose
@@ -47,8 +53,13 @@ export default function BidRecordModal({
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [categoryFilter, setCategoryFilter] = useState<string[]>(["이동", "입찰", "도박"]);
 
+    const [showRanking, setShowRanking] = useState(false);
     const [seatCodeFilter, setSeatCodeFilter] = useState<string | null>(null);
     const [filteredRecords, setFilteredRecords] = useState<BidHistoryRecord[]>([]);
+
+    const [rankingData, setRankingData] = useState<RankingData[]>([]);
+    const [sortedRankingData, setSortedRankingData] = useState<RankingData[]>([]);
+    const [rankBy, setRankBy] = useState<"bid_count" | "gamble_success_rate" | "gamble_count">("bid_count");
 
     const handleCategoryFilterChange = (category: string) => {
         if (categoryFilter.includes(category)) {
@@ -57,6 +68,24 @@ export default function BidRecordModal({
             setCategoryFilter([...categoryFilter, category]);
         }
     };
+
+    useEffect(() => {
+        if(rankingData.length > 0) {
+            const sortedData = [...rankingData].sort((a, b) => {
+                switch (rankBy) {
+                    case "bid_count":
+                        return b.bid_count - a.bid_count;
+                    case "gamble_success_rate":
+                        const aRate = a.success_count + a.fail_count > 0 ? a.success_count / (a.success_count + a.fail_count) : 0;
+                        const bRate = b.success_count + b.fail_count > 0 ? b.success_count / (b.success_count + b.fail_count) : 0;
+                        return bRate - aRate;
+                    case "gamble_count":
+                        return (b.success_count + b.fail_count) - (a.success_count + a.fail_count);
+                }
+            });
+            setSortedRankingData(sortedData);
+        }
+    }, [rankingData, rankBy]);
 
 	useEffect(() => {
 		let isActive = true;
@@ -68,7 +97,49 @@ export default function BidRecordModal({
 			try {
 				const history = await getHistoriesByRound(roundId);
 				if (isActive) setRecords(history.map(record => ({ ...record, category: record.method === "BID" ? record.prev_group_name === null ? "이동" : "입찰":  "도박" })) as BidHistoryRecord[]);
-			} catch (error) {
+                
+                const initialRankingData: RankingData[] = [];
+                for(const record of history) {
+                    if(record.method === "GAMBLE") {
+                        const existingRanking = initialRankingData.find(r => r.user_name === record.user_name);
+
+                        if(existingRanking) {
+                            if(record.price_change < 0)
+                                existingRanking.success_count += 1;
+                            else 
+                                existingRanking.fail_count += 1;
+                        }
+                        else {
+                            initialRankingData.push({
+                                user_name: record.user_name,
+                                bid_count: 0,
+                                success_count: record.price_change < 0 ? 1 : 0,
+                                fail_count: record.price_change < 0 ? 0 : 1
+                            });
+                        }
+                    }
+                    if(record.method === "BID") {
+                        if(record.price_change > 0) {
+                            const existingRanking = initialRankingData.find(r => r.user_name === record.user_name);
+
+                            if(existingRanking)
+                                existingRanking.bid_count += 1;
+                            
+                            else {
+                                initialRankingData.push({
+                                    user_name: record.user_name,
+                                    bid_count: 1,
+                                    success_count: 0,
+                                    fail_count: 0
+                                });
+                            }
+                        }
+                    }
+                    
+                }
+                setRankingData(initialRankingData);
+            
+            } catch (error) {
 				if (isActive) {
 					setErrorMessage(
 						error instanceof Error ? error.message : "기록을 불러오지 못했습니다."
@@ -96,9 +167,10 @@ export default function BidRecordModal({
 				<div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 p-5">
 					<h2 className="flex items-center gap-2 text-lg font-bold text-slate-800">
 						<History className="h-5 w-5 text-indigo-600" />
-						입찰 기록
+						기록
 					</h2>
-                    <div className = "flex flex-row gap-2 mr-auto ml-4">
+                    {
+                        showRanking || <div className = "flex flex-row gap-2 mr-auto ml-4">
                         {["이동", "입찰", "도박"].map((category) => (
                             
                             <button
@@ -128,7 +200,16 @@ export default function BidRecordModal({
                                 ))}
                             </select>
                         </div>
-                    </div>
+                    </div>}
+                    <button
+                        type="button"
+                        onClick={() => setShowRanking(!showRanking)}
+                        className="mr-5 ml-auto flex flex-row items-center gap-1 rounded-full bg-rose-600 px-4 py-1 text-sm font-semibold text-white transition-colors hover:bg-rose-700"
+                    >
+                        
+                        <Crown className="h-4 w-4"/>
+                        {showRanking ? "기록 보기" : "랭킹 보기"}
+                    </button>
 					<button
 						type="button"
 						onClick={onClose}
@@ -147,7 +228,65 @@ export default function BidRecordModal({
 						</div>
 					) : errorMessage ? (
 						<p className="py-12 text-center text-sm text-rose-500">{errorMessage}</p>
-					) : filteredRecords.length === 0 ? (
+					) : showRanking ? (
+                        <div className="flex flex-col">
+                            <div className="mb-4 flex items-center gap-2 justify-end">
+                                <label htmlFor="rankBy" className="mr-2 text-sm font-semibold text-slate-700">정렬 기준:</label>
+                                <select
+                                    id="rankBy"
+                                    className="rounded-md border border-slate-300 bg-white py-1 px-2 text-sm text-slate-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                    value={rankBy}
+                                    onChange={(e) => setRankBy(e.target.value as "bid_count" | "gamble_success_rate" | "gamble_count")}
+                                >
+                                    <option value="bid_count">입찰 횟수</option>
+                                    <option value="gamble_count">도박 횟수</option>
+                                    <option value="gamble_success_rate">도박 성공률</option>
+                                </select>    
+                            </div>
+                            <div className="space-y-3">
+                                {rankingData.length === 0 ? (
+                                    <p className="py-12 text-center text-sm text-slate-400">
+                                        랭킹 데이터가 없습니다.
+                                    </p>
+                                ) : (
+                                    sortedRankingData.map((record, index) => {
+                                        const user = record.user_name;
+                                        const bidCount = record.bid_count;
+                                        const successCount = record.success_count;
+                                        const failCount = record.fail_count;
+                                        
+
+                                        return (
+                                            <div
+                                                key={`${String(record.user_name ?? index)}-${index}`}
+                                                className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                                            >
+                                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                                                    {user != null && <span className="font-bold text-slate-800">{String(user)}</span>}
+                                                    <span className="ml-auto font-semibold text-amber-600 flex flex-row gap-1">
+                                                        입찰 횟수: {String(bidCount)}회
+                                                        <p className="ml-auto font-semibold text-emerald-600">( +{String(bidCount * 500)} )</p>
+                                                    </span>
+                                                    <span className="ml-auto font-semibold text-slate-600 flex flex-row">
+                                                        도박 횟수: {String(successCount + failCount)}회
+                                                        
+                                                    </span>
+                                                    <span className="ml-auto font-semibold text-slate-600 flex flex-row">
+                                                        성공률: {String(((successCount / (Math.max(successCount + failCount, 1))) * 100).toFixed(2))}%
+                                                        (<p className="ml-auto font-semibold text-emerald-600">{String(successCount)}</p>/
+                                                        <p className="ml-auto font-semibold text-rose-600">{String(failCount)}</p>)
+                                                        
+                                                    </span>
+                                                    
+                                                </div>
+                                            </div>
+                                        );
+
+                                    }))}
+                            </div>
+                        </div>
+                    ) : (
+                    filteredRecords.length === 0 ? (
 						<p className="py-12 text-center text-sm text-slate-400">
 							저장된 입찰 기록이 없습니다.
 						</p>
@@ -193,7 +332,7 @@ export default function BidRecordModal({
 								);
 							})}
 						</div>
-					)}
+					))}
 				</div>
 			</div>
 		</div>
